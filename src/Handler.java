@@ -11,33 +11,26 @@ public class Handler implements Runnable {
 	public Handler(Socket connectionSocket) {
 		socket = connectionSocket;
 	}
-//
-//	public void CalRequest(Socket socket) {
-//		this.socket = socket;
-//	}
 	
 	@Override
 	public void run() {
 		BufferedReader inFromClient;
 		try {
-			inFromClient = new BufferedReader(
-					new InputStreamReader(socket.getInputStream()));
+			// Create inputstream (convenient data reader) to this host.
+			InputStreamReader inputStreamReader = 
+					new InputStreamReader(socket.getInputStream());
+			inFromClient = new BufferedReader(inputStreamReader);
+			
+			// Create outputstream (convenient data writer) to this host.
 			DataOutputStream outToClient = new DataOutputStream(
 					socket.getOutputStream());
+			
+			// Read text from the client, make it uppercase and write it back.
 			String clientSentence = inFromClient.readLine();
 			System.out.println("RECIEVED: " + clientSentence);
-			for (int i = 0; i < 10; i++) {
-				System.out.println(i);
-				for (int j = 0; j < 100000000; j++) {
-					double x = i/Math.sqrt(j);
-					x = x/(x*Math.sqrt(x));
-					for (int k = 0; k < 100000000; k++) {
-						k = k*k*k*k;
-					}
-				}
-			}
 			String capsSentence = clientSentence.toUpperCase() + '\n';
 			outToClient.writeBytes(capsSentence);
+			System.out.println("SENT: "+ capsSentence);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
