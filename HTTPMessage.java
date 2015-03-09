@@ -1,22 +1,9 @@
 
-public class HTTPMessage {
+public abstract class HTTPMessage {
 	
 	public HTTPMessage() {
 		this.messageBody = "";
 	}
-	
-	public String getInitialLine() {
-		return initialLine;
-	}
-	
-	public void setInitialLine(String initialLine) {
-		this.initialLine= initialLine; 
-	}
-	
-	/*
-	 * Variable referencing the initial line of this HTTP message;
-	 */
-	private String initialLine;
 	
 	/*
 	 * Return all headers of this HTTP message if it exists.

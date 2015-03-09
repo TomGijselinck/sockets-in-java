@@ -1,6 +1,6 @@
 import java.net.*;
 
-public class TCPServer {
+public class HTTPServer {
 	private static ServerSocket welcomeSocket;
 
 	public static void main(String argv[]) throws Exception {
