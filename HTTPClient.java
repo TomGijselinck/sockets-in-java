@@ -24,15 +24,12 @@ public class HTTPClient {
 				"/faq.png", HTTPversion);
 		testClient.setHTTPRequestMessage(request);
 		InputStream inFromServer = testClient.sendHTTPRequestMessage();
+		
 		// Read HTTP response message from the server, write it to the console
 		// and write to a local file.
 		testClient.parseHTTPMessage(inFromServer);
 
-		// check headers
-		System.out.println(testClient.getResponseMessage().getHeaderValue(
-				"Content-Type"));
-
-		// get embedded objects from the recieved HTTP response message body
+		// get embedded objects from the received HTTP response message body
 		String html = testClient.getResponseMessage().getMessageBody();
 		HTTPClient.getEmbeddedObjects(html);
 
@@ -116,7 +113,9 @@ public class HTTPClient {
 	 */
 	public void parseHTTPMessage(InputStream inFromServer)
 			throws IOException {
-		InputStreamReader inStreamReader = new InputStreamReader(inFromServer); 
+		BufferedInputStream bis = new BufferedInputStream(inFromServer);
+		bis.mark(3072);
+		InputStreamReader inStreamReader = new InputStreamReader(bis); 
 		BufferedReader serverResponseText = new BufferedReader(inStreamReader);
 		setResponseMessage(new HTTPResponseMessage(getRequestMessage()
 				.getLocalPathRequest()));
@@ -140,11 +139,12 @@ public class HTTPClient {
 		
 		// parse message body
 		if (responseMessage.containsTextFile()) {
-			System.out.println("NOTICE: message body is text");
+			System.out.println("Notice: message body is text");
 			parseTextMessageBody(serverResponseText);
 		} else if (responseMessage.containsBinaryFile()) {
-			System.out.println("NOTICE: message body is binary data");
-			parseBinaryMessageBody();
+			System.out.println("Notice: message body is binary data");
+			bis.reset();
+			parseBinaryMessageBody(bis);
 		}
 		
 		if (getRequestMessage().getHTTPVersion() == "HTTP/1.0") {
@@ -207,10 +207,8 @@ public class HTTPClient {
 
 	}
 	
-	private void parseBinaryMessageBody()
+	private void parseBinaryMessageBody(BufferedInputStream inStream)
 			throws IOException {
-//		InputStream inFromServer = clientSocket.getInputStream();
-		InputStream inFromServer = sendHTTPRequestMessage();
 		File file = new File(workingDirectory
 				+ responseMessage.getPathRequestedResource());
 		if (!file.exists()) {
@@ -219,28 +217,23 @@ public class HTTPClient {
 		}
 		FileOutputStream fos = new FileOutputStream(file.getAbsoluteFile());
 		BufferedOutputStream outStream = new BufferedOutputStream(fos);
-		BufferedInputStream inStream = new BufferedInputStream(inFromServer);
 		byte[] buffer = new byte[1024];
 		int bytesRead = 0;
 		boolean endOfHeaderFound = false;
 		int headerBytesRead;
 		while ((bytesRead = inStream.read(buffer)) != -1) {
 			headerBytesRead = 0;
-			System.out.println(bytesRead);
-			System.out.println(new String(buffer, 0, bytesRead));
+			System.out.println("Notice: " + bytesRead + " bytes read to buffer");
 			if (!endOfHeaderFound) {
 				String string = new String(buffer, 0, bytesRead);
 				int indexOfEndOfHeader = string.indexOf("\r\n\r\n");
 				if (indexOfEndOfHeader != -1) {
 					headerBytesRead = indexOfEndOfHeader + 4;
-					System.out.println("headerbytes = " + headerBytesRead);
-//					buffer = string.substring(indexOfEndOfHeader+4).getBytes();
 					endOfHeaderFound = true;
 				} else {
 					bytesRead = 0;
 				}
 			}
-			System.out.println("bytesRead = " + bytesRead);
 			outStream.write(buffer, headerBytesRead, bytesRead - headerBytesRead);
 			outStream.flush();
 		}
