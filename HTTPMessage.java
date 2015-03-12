@@ -1,3 +1,6 @@
+import java.util.HashMap;
+import java.util.Map;
+
 
 public abstract class HTTPMessage {
 	
@@ -8,19 +11,28 @@ public abstract class HTTPMessage {
 	/*
 	 * Return all headers of this HTTP message if it exists.
 	 */
-	public String getHeaders() {
+	public Map<String, String> getHeaders() {
 		return headers;
 	}
 	
+	public String getHeaderValue(String header) {
+		if(headers.containsKey(header)) {
+			return headers.get(header);
+		} else {
+			System.out.println("Warning: no header of type " + header);
+			return null;
+		}
+	}
+	
 	public void addAsHeader(String header, String value) {
-		//TODO: work out
+		headers.put(header, value);
 	}
 	
 	/*
 	 * Variable referencing all header lines of this HTTP message.
 	 * TODO: maak hier een linked list of bibliotheek van
 	 */
-	private String headers;
+	private Map<String, String> headers = new HashMap<String, String>();
 	
 	public String getMessageBody() {
 		return messageBody;
@@ -42,5 +54,13 @@ public abstract class HTTPMessage {
 	 * Variable referencing the message body of this HTTP message.
 	 */
 	private String messageBody;
+	
+	public boolean containsBinaryFile() {
+		return !containsTextFile();
+	}
+	
+	public boolean containsTextFile() {
+		return getHeaderValue("Content-Type").contains("text");
+	}
 
 }

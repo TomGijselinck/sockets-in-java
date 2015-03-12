@@ -1,2 +1,4 @@
 http://www.binarytides.com/java-socket-programming-tutorial/
 http://jsoup.org/
+http://stackoverflow.com/questions/5777503/how-to-store-an-http-response-that-may-contain-binary-data
+http://stackoverflow.com/questions/19985169/download-image-through-sockets-java:
