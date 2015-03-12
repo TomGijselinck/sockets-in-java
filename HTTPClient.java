@@ -10,7 +10,7 @@ public class HTTPClient {
 
 	public static void main(String[] args) throws Exception {
 		HTTPMethod method = HTTPMethod.parseMethod(args[0]);
-		String host = args[1];
+		URI host = new URI(args[1]);
 		int port = 80;
 		try {
 			port = Integer.parseInt(args[2]);
@@ -19,9 +19,9 @@ public class HTTPClient {
 			System.exit(1);
 		}
 		String HTTPversion = args[3];
-		HTTPClient testClient = new HTTPClient(host, port);
+		HTTPClient testClient = new HTTPClient(host.getHost(), port);
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
-				"/faq.png", HTTPversion);
+				"/index.html", HTTPversion);
 		testClient.setHTTPRequestMessage(request);
 		InputStream inFromServer = testClient.sendHTTPRequestMessage();
 		
@@ -31,7 +31,7 @@ public class HTTPClient {
 
 		// get embedded objects from the received HTTP response message body
 		String html = testClient.getResponseMessage().getMessageBody();
-		HTTPClient.getEmbeddedObjects(html);
+		testClient.getEmbeddedObjects(html);
 
 	}
 
@@ -154,6 +154,7 @@ public class HTTPClient {
 		if (getRequestMessage().getHTTPVersion() == "HTTP/1.0") {
 			clientSocket.close();
 		}
+		System.out.println("");
 	}
 
 	/**
@@ -179,20 +180,31 @@ public class HTTPClient {
 
 		// Compose HTTP request message and send to the server.
 		outToServer.writeBytes(httpRequest.composeMessage());
-		System.out.println("message send: \n" + httpRequest.composeMessage()
-				+ "to " + host + ":" + port);
+		System.out.println("message send: \n" + httpRequest.composeMessage().trim()
+				+ "\nto " + host + ":" + port);
 		
 		return inFromServer;
 	}
 
-	private static void getEmbeddedObjects(String html) {
+	private void getEmbeddedObjects(String html) {
 		// Use the Jsoup library to parse the html document
-		Document doc = Jsoup.parse(html);
+		Document doc = Jsoup.parse(html, "http://" + host);
 
-		// select all images from the parsed html document
+		// select all images from the parsed html document and download relative
+		// path embedded objects using a HTTP GET request message
 		Elements links = doc.select("img[src]");
 		for (Element link : links) {
-			System.out.println("NESTED LINKS: " + link.attr("src"));
+			try {
+				URI uri = new URI(link.attr("abs:src"));
+				if (uri.getHost().contentEquals(host)) {
+					getRequestMessage().setMethod(HTTPMethod.GET);
+					getRequestMessage().setLocalPathRequest(uri.getPath());
+					InputStream inFromServer = sendHTTPRequestMessage();
+					parseHTTPMessage(inFromServer);
+				}
+			} catch (URISyntaxException | IOException e) {
+				e.printStackTrace();
+			}
 		}
 
 	}
