@@ -1,8 +1,9 @@
 
 public class HTTPResponseMessage extends HTTPMessage {
 
-	public HTTPResponseMessage() {
+	public HTTPResponseMessage(String pathRequestedResource) {
 		super();
+		this.pathRequestedResource = pathRequestedResource;
 	}
 	
 	public String getHTTPVersion() {
@@ -34,6 +35,16 @@ public class HTTPResponseMessage extends HTTPMessage {
 	}
 	
 	private String reasonPhrase;
+	
+	public String getPathRequestedResource() {
+		return pathRequestedResource;
+	}
+	
+	public void setPathRequestedResource(String path) {
+		pathRequestedResource = path;
+	}
+	
+	private String pathRequestedResource;
 	
 	public String getStatusLine() {
 		return HTTPVersion + " " + responseStatusCode + " " + reasonPhrase;

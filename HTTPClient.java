@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -14,25 +15,30 @@ public class HTTPClient {
 		try {
 			port = Integer.parseInt(args[2]);
 		} catch (Exception e) {
-			System.err.println("Argument" + args[2] + " must be an integer.");
+			System.err.println("Argument" + args[2] + " must be an integer");
 			System.exit(1);
 		}
 		String HTTPversion = args[3];
 		HTTPClient testClient = new HTTPClient(host, port);
-		HTTPRequestMessage request = new HTTPRequestMessage(method, "/",
-				HTTPversion);
+		HTTPRequestMessage request = new HTTPRequestMessage(method,
+				"/faq.png", HTTPversion);
 		testClient.setHTTPRequestMessage(request);
-		testClient.sendHTTPRequestMessage();
+		InputStream inFromServer = testClient.sendHTTPRequestMessage();
+		
+		// Read HTTP response message from the server, write it to the console
+		// and write to a local file.
+		testClient.parseHTTPMessage(inFromServer);
 
-		// get embedded objects from the recieved HTTP response message body
+		// get embedded objects from the received HTTP response message body
 		String html = testClient.getResponseMessage().getMessageBody();
-		testClient.getEmbeddedObjects(html);
+		HTTPClient.getEmbeddedObjects(html);
 
 	}
 
 	public HTTPClient(String host, int port) {
 		setHost(host);
 		setPort(port);
+		setWorkingDirectory("/home/tom/http");
 	}
 
 	public HTTPRequestMessage getRequestMessage() {
@@ -75,82 +81,176 @@ public class HTTPClient {
 	}
 
 	private int port;
+	
+	public Socket getCLientSOcket() {
+		return clientSocket;
+	}
+	
+	public void setClientSocket(Socket socket) {
+		clientSocket = socket;
+	}
+	
+	private Socket clientSocket;
 
+	public String getWorkingDirectory() {
+		return workingDirectory;
+	}
+	
+	public void setWorkingDirectory(String directory) {
+		workingDirectory = directory;
+	}
+	
+	/**
+	 * Variable referencing the workingdirectory in the filesystem of the system 
+	 * where this HTTP client is running on. The working directory is used to
+	 * store recieved files from the HTTP server.
+	 */
+	private String workingDirectory;
+	
 	/**
 	 * Parse the HTTP response message from the server and store as a local
-	 * file.
+	 * file in the corresponding file tree.
+	 * 
+	 * @param 	inFromServer
+	 * 			The input stream to parse the HTTP message from.
+	 * @throws 	IOException
 	 */
-	public void parseHTTPMessage(BufferedReader serverResponse)
+	public void parseHTTPMessage(InputStream inFromServer)
 			throws IOException {
-		File file = new File("/home/tom/http/index.html");
+		BufferedInputStream bis = new BufferedInputStream(inFromServer);
+		bis.mark(3072);
+		InputStreamReader inStreamReader = new InputStreamReader(bis); 
+		BufferedReader serverResponseText = new BufferedReader(inStreamReader);
+		setResponseMessage(new HTTPResponseMessage(getRequestMessage()
+				.getLocalPathRequest()));
+		System.out.println("================RESPONSE================");
+		responseMessage.setStatusLine(serverResponseText.readLine());
+		System.out.println(responseMessage.getStatusLine());
+		
+		// parse message headers
+		String response;
+		while ((response = serverResponseText.readLine()) != null) {
+			System.out.println(response);
+			// check for the transition from the header part of the message to
+			// the body part of the message.
+			if (response.trim().equals("")) {
+				break; // all headers are parsed
+			}
+			//TODO use different method than split
+			String[] header = response.split(":");
+			responseMessage.addAsHeader(header[0], header[1]);
+		}
+		
+		// parse message body
+		if (responseMessage.containsTextFile()) {
+			System.out.println("Notice: message body is text");
+			parseTextMessageBody(serverResponseText);
+		} else if (responseMessage.containsBinaryFile()) {
+			System.out.println("Notice: message body is binary data");
+			bis.reset();
+			parseBinaryMessageBody(bis);
+		}
+		
+		if (getRequestMessage().getHTTPVersion() == "HTTP/1.0") {
+			clientSocket.close();
+		}
+	}
+
+	/**
+	 * Send the HTTP request message of this HTTP client to the host of this 
+	 * client and return the response of the host to the send request message.
+	 * 
+	 * @return	The resulting input stream is the response from the host.
+	 * @throws IOException
+	 */
+	public InputStream sendHTTPRequestMessage() throws IOException {
+		HTTPRequestMessage httpRequest = getRequestMessage();
+		// Create a socket to the given URI at the given port.
+		clientSocket = new Socket(host, port);
+
+		// Create an output stream (convenient data writer) to this host.
+		DataOutputStream outToServer = new DataOutputStream(
+				clientSocket.getOutputStream());
+
+		// Create an input stream (convenient data reader) to this host and wrap
+		// a buffered input stream around the input stream for increased 
+		// efficiency.
+		InputStream inFromServer = clientSocket.getInputStream();
+
+		// Compose HTTP request message and send to the server.
+		outToServer.writeBytes(httpRequest.composeMessage());
+		System.out.println("message send: \n" + httpRequest.composeMessage()
+				+ "to " + host + ":" + port);
+		
+		return inFromServer;
+	}
+
+	private static void getEmbeddedObjects(String html) {
+		// Use the Jsoup library to parse the html document
+		Document doc = Jsoup.parse(html);
+
+		// select all images from the parsed html document
+		Elements links = doc.select("img[src]");
+		for (Element link : links) {
+			System.out.println("NESTED LINKS: " + link.attr("src"));
+		}
+
+	}
+	
+	private void parseTextMessageBody(BufferedReader inFromServer)
+			throws IOException {
+		File file = new File(workingDirectory
+				+ responseMessage.getPathRequestedResource());
 		if (!file.exists()) {
 			file.getParentFile().mkdirs();
 			file.createNewFile();
 		}
 		FileWriter fw = new FileWriter(file.getAbsoluteFile());
 		BufferedWriter bw = new BufferedWriter(fw);
-		setResponseMessage(new HTTPResponseMessage());
 		String response;
-		boolean bodyMessage = false;
-		boolean headerMessage = true;
-		System.out.println("================RESPONSE================");
-		responseMessage.setStatusLine(serverResponse.readLine());
-		System.out.println(responseMessage.getStatusLine());
-		while ((response = serverResponse.readLine()) != null) {
+		while ((response = inFromServer.readLine()) != null) {
 			System.out.println(response);
-			if (response.trim().equals("")) {
-				headerMessage = false;
-				bodyMessage = true;
-				continue;
-			}
-			if (headerMessage) {
-				String[] header = response.split(":");
-				responseMessage.addAsHeader(header[0], header[1]);
-			} else if (bodyMessage) {
-				responseMessage.addToMessageBody(response);
-				bw.write(response + "\n");
-			}
+			responseMessage.addToMessageBody(response);
+			bw.write(response + "\n");
 		}
 		bw.close();
-	}
+		System.out.println("End of stream");
 
-	public void sendHTTPRequestMessage() throws IOException {
-		HTTPRequestMessage httpRequest = getRequestMessage();
-		DataOutputStream outToServer = null;
-		BufferedReader inFromServer = null;
-		// Create a socket to the given URI at the given port.
-		Socket clientSocket = new Socket(host, port);
-
-		// Create outputstream (convenient data writer) to this host.
-		outToServer = new DataOutputStream(clientSocket.getOutputStream());
-
-		// Create an inputstream (convenient data reader) to this host.
-		inFromServer = new BufferedReader(new InputStreamReader(
-				clientSocket.getInputStream()));
-
-		// Compose HTTP request message and send to the server.
-		outToServer.writeBytes(httpRequest.composeMessage());
-		System.out.println("message send: \n" + httpRequest.composeMessage()
-				+ "to " + host + ":" + port);
-
-		// Read HTTP response message from the server, write it to the console
-		// and write to a local file.
-		parseHTTPMessage(inFromServer);
-		if (httpRequest.getHTTPVersion() == "HTTP/1.0") {
-			clientSocket.close();
-		}
 	}
 	
-	public void getEmbeddedObjects(String html) {
-		// Use the Jsoup library to parse the html document
-		Document doc = Jsoup.parse(html);
-		
-		// select all images from the parsed html document
-		Elements links = doc.select("img[src]");
-		for (Element link : links) {
-			System.out.println("NESTED LINKS: " + link.attr("src"));
+	private void parseBinaryMessageBody(BufferedInputStream inStream)
+			throws IOException {
+		File file = new File(workingDirectory
+				+ responseMessage.getPathRequestedResource());
+		if (!file.exists()) {
+			file.getParentFile().mkdirs();
+			file.createNewFile();
 		}
-		
+		FileOutputStream fos = new FileOutputStream(file.getAbsoluteFile());
+		BufferedOutputStream outStream = new BufferedOutputStream(fos);
+		byte[] buffer = new byte[1024];
+		int bytesRead = 0;
+		boolean endOfHeaderFound = false;
+		int headerBytesRead;
+		while ((bytesRead = inStream.read(buffer)) != -1) {
+			headerBytesRead = 0;
+			System.out.println("Notice: " + bytesRead +" bytes read to buffer");
+			if (!endOfHeaderFound) {
+				String string = new String(buffer, 0, bytesRead);
+				int indexOfEndOfHeader = string.indexOf("\r\n\r\n");
+				if (indexOfEndOfHeader != -1) {
+					headerBytesRead = indexOfEndOfHeader + 4;
+					endOfHeaderFound = true;
+				} else {
+					bytesRead = 0;
+				}
+			}
+			outStream.write(buffer, headerBytesRead, bytesRead-headerBytesRead);
+			outStream.flush();
+		}
+		outStream.close();
+		fos.close();
+		System.out.println("End of stream");
 	}
 
 }
