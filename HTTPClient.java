@@ -106,10 +106,14 @@ public class HTTPClient {
 	 * store recieved files from the HTTP server.
 	 */
 	private String workingDirectory;
-
+	
 	/**
 	 * Parse the HTTP response message from the server and store as a local
 	 * file in the corresponding file tree.
+	 * 
+	 * @param 	inFromServer
+	 * 			The input stream to parse the HTTP message from.
+	 * @throws 	IOException
 	 */
 	public void parseHTTPMessage(InputStream inFromServer)
 			throws IOException {
@@ -152,6 +156,13 @@ public class HTTPClient {
 		}
 	}
 
+	/**
+	 * Send the HTTP request message of this HTTP client to the host of this 
+	 * client and return the response of the host to the send request message.
+	 * 
+	 * @return	The resulting input stream is the response from the host.
+	 * @throws IOException
+	 */
 	public InputStream sendHTTPRequestMessage() throws IOException {
 		HTTPRequestMessage httpRequest = getRequestMessage();
 		// Create a socket to the given URI at the given port.
@@ -223,7 +234,7 @@ public class HTTPClient {
 		int headerBytesRead;
 		while ((bytesRead = inStream.read(buffer)) != -1) {
 			headerBytesRead = 0;
-			System.out.println("Notice: " + bytesRead + " bytes read to buffer");
+			System.out.println("Notice: " + bytesRead +" bytes read to buffer");
 			if (!endOfHeaderFound) {
 				String string = new String(buffer, 0, bytesRead);
 				int indexOfEndOfHeader = string.indexOf("\r\n\r\n");
@@ -234,7 +245,7 @@ public class HTTPClient {
 					bytesRead = 0;
 				}
 			}
-			outStream.write(buffer, headerBytesRead, bytesRead - headerBytesRead);
+			outStream.write(buffer, headerBytesRead, bytesRead-headerBytesRead);
 			outStream.flush();
 		}
 		outStream.close();
