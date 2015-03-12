@@ -10,7 +10,8 @@ public class HTTPClient {
 
 	public static void main(String[] args) throws Exception {
 		HTTPMethod method = HTTPMethod.parseMethod(args[0]);
-		URI host = new URI(args[1]);
+		if (!args[1].contains("http")) {args[1] = "http://" + args[1];}
+		URI uri = new URI(args[1]);
 		int port = 80;
 		try {
 			port = Integer.parseInt(args[2]);
@@ -19,7 +20,7 @@ public class HTTPClient {
 			System.exit(1);
 		}
 		String HTTPversion = args[3];
-		HTTPClient testClient = new HTTPClient(host.getHost(), port);
+		HTTPClient testClient = new HTTPClient(uri.getHost(), port);
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
 				"/index.html", HTTPversion);
 		testClient.setHTTPRequestMessage(request);
@@ -193,6 +194,7 @@ public class HTTPClient {
 		// select all images from the parsed html document and download relative
 		// path embedded objects using a HTTP GET request message
 		Elements links = doc.select("img[src]");
+		if (links.isEmpty()) {System.out.println("Notice: no embedded images");}
 		for (Element link : links) {
 			try {
 				URI uri = new URI(link.attr("abs:src"));
