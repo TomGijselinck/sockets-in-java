@@ -38,12 +38,12 @@ public class HTTPClient {
 				request.setIfModifiedSinceHeader(new Date(file.lastModified()));
 			}
 		}
-		
-		
 		testClient.setHTTPRequestMessage(request);
 		
 		// Send the constructed HTTP request message and create an input stream
 		// for receiving the response message from the server.
+		testClient.setClientSocket(new Socket(testClient.getHost(), testClient
+				.getPort())); //TODO zonder argumenten
 		InputStream inFromServer = testClient.sendHTTPRequestMessage();
 		
 		// Read HTTP response message from the server, write it to the console
@@ -206,7 +206,9 @@ public class HTTPClient {
 	public InputStream sendHTTPRequestMessage() throws IOException {
 		HTTPRequestMessage httpRequest = getRequestMessage();
 		// Create a socket to the given URI at the given port.
-		clientSocket = new Socket(host, port);
+		if (getRequestMessage().getHTTPVersion() == "HTTP/1.0") {
+			clientSocket = new Socket(host, port);
+		}		
 
 		// Create an output stream (convenient data writer) to this host.
 		DataOutputStream outToServer = new DataOutputStream(
