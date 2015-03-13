@@ -1,3 +1,12 @@
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.logging.SimpleFormatter;
+
 /**
  * A class of HTTP request messages as special kind of HTTP messages involving
  * as additional properties a HTTP method, a path to the requested resource and
@@ -60,11 +69,23 @@ public class HTTPRequestMessage extends HTTPMessage {
 		return method + " " + localPathRequest + " " + HTTPVersion;
 	}
 
-	//TODO pas headers aan
 	public String composeMessage() {
-		String message = getRequestLine() + "\r\n" + "Host: "
-				+ getClient().getHost() + "\r\n\r\n";
+		String message = getRequestLine() + "\r\n";
+		//loop over all headers and add them to message
+		for (Map.Entry<String, String> entry : getHeaders().entrySet()) {
+			String header = entry.getKey() + ": " + entry.getValue() + "\r\n";
+			message += header;
+		}
+		message += "\r\n";
 		return message;
+	}
+	
+	public void setIfModifiedSinceHeader(Date date) {
+		SimpleDateFormat dateFormat = 
+				new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+		dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+		addAsHeader("If-Modified-Since", dateFormat.format(date));
+		
 	}
 
 }

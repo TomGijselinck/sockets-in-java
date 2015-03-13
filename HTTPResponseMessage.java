@@ -1,9 +1,8 @@
 
 public class HTTPResponseMessage extends HTTPMessage {
 
-	public HTTPResponseMessage(String pathRequestedResource) {
+	public HTTPResponseMessage() {
 		super();
-		this.pathRequestedResource = pathRequestedResource;
 	}
 	
 	public String getHTTPVersion() {
