@@ -17,7 +17,7 @@ public abstract class HTTPMessage {
 	
 	public String getHeaderValue(String header) {
 		if(headers.containsKey(header)) {
-			return headers.get(header);
+			return headers.get(header).trim();
 		} else {
 			System.out.println("Warning: no header of type " + header);
 			return null;
@@ -26,6 +26,10 @@ public abstract class HTTPMessage {
 	
 	public void addAsHeader(String header, String value) {
 		headers.put(header, value);
+	}
+	
+	public void removeAsHeader(String header) {
+		headers.remove(header);
 	}
 	
 	/*

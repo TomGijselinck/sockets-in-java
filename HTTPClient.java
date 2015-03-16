@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.Arrays;
 import java.util.Date;
 
 import org.jsoup.Jsoup;
@@ -29,7 +30,7 @@ public class HTTPClient {
 		
 		// Create the first request message using the given arguments.
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
-				"/index.html", HTTPversion);
+				"/", HTTPversion);
 		request.addAsHeader("Host", testClient.getHost());
 		if (method.equals(HTTPMethod.GET)) {
 			File file = new File(testClient.workingDirectory + "/"
@@ -38,12 +39,14 @@ public class HTTPClient {
 				request.setIfModifiedSinceHeader(new Date(file.lastModified()));
 			}
 		}
+		if (HTTPversion.contains("1.1")) {
+			request.addAsHeader("Connection", "Keep-Alive");
+		}
 		testClient.setHTTPRequestMessage(request);
 		
 		// Send the constructed HTTP request message and create an input stream
 		// for receiving the response message from the server.
-		testClient.setClientSocket(new Socket(testClient.getHost(), testClient
-				.getPort())); //TODO zonder argumenten
+		testClient.setClientSocket();
 		InputStream inFromServer = testClient.sendHTTPRequestMessage();
 		
 		// Read HTTP response message from the server, write it to the console
@@ -106,8 +109,12 @@ public class HTTPClient {
 
 	private int port;
 	
-	public Socket getCLientSOcket() {
+	public Socket getClientSocket() {
 		return clientSocket;
+	}
+	
+	public void setClientSocket() throws UnknownHostException, IOException {
+		clientSocket = new Socket(getHost(), getPort());
 	}
 	
 	public void setClientSocket(Socket socket) {
@@ -125,7 +132,7 @@ public class HTTPClient {
 	}
 	
 	/**
-	 * Variable referencing the working directory in the filesystem of the 
+	 * Variable referencing the working directory in the file system of the 
 	 * system where this HTTP client is running on. The working directory is
 	 * used to store received files from the HTTP server.
 	 */
@@ -138,18 +145,15 @@ public class HTTPClient {
 	 * @param 	inFromServer
 	 * 			The input stream to parse the HTTP message from.
 	 * @throws 	IOException
+	 * @throws InterruptedException 
 	 */
 	public void parseHTTPMessage(InputStream inFromServer)
-			throws IOException {
+			throws IOException, InterruptedException {
 		// Construct a buffered input stream to wrap the input stream from the 
 		// server to enable buffering and to use BufferedInputStream.mark() and
 		// BufferedInputStream.reset() to return the input stream to a marked 
 		// point in the stream.
 		BufferedInputStream bis = new BufferedInputStream(inFromServer);
-		
-		// Set the current point in the stream as the return point with a 
-		// maximum possible read data of 3072 bytes before the mark is given up.
-		bis.mark(3072);
 		
 		// Wrap the buffered input stream with a InputStreamReader and wrap this
 		// with a BufferedReader to create a buffered character stream for
@@ -162,7 +166,12 @@ public class HTTPClient {
 		response.setPathRequestedResource(getRequestMessage().getLocalPathRequest());
 		setResponseMessage(response);
 		System.out.println("================RESPONSE================");
-		responseMessage.setStatusLine(serverResponseText.readLine());
+		
+		// Set the current point in the stream as the return point with a 
+		// maximum possible read data of 3072 bytes before the mark is given up.
+		bis.mark(10*1024); // less results in lost mark point
+		String statusLine = serverResponseText.readLine();
+		responseMessage.setStatusLine(statusLine);
 		System.out.println(responseMessage.getStatusLine());
 		
 		// parse message headers
@@ -183,15 +192,18 @@ public class HTTPClient {
 			System.out.println("[Notice] requested resource not modified");
 		} else if (responseMessage.containsTextFile()) {
 			System.out.println("[Notice] message body is text");
-			parseTextMessageBody(serverResponseText);
+			bis.reset();
+			parseBodyMessage(bis);
 		} else if (responseMessage.containsBinaryFile()) {
 			System.out.println("[Notice] message body is binary data");
 			bis.reset();
-			parseBinaryMessageBody(bis);
+			parseBodyMessage(bis);
 		}
 		
-		if (getRequestMessage().getHTTPVersion() == "HTTP/1.0") {
-			clientSocket.close();
+		if (getRequestMessage().getHTTPVersion().contains("1.0")) {
+			getClientSocket().close();
+		} else if (getRequestMessage().getHTTPVersion().contains("1.1")) {
+			getClientSocket().setKeepAlive(true);
 		}
 		System.out.println("");
 	}
@@ -206,21 +218,22 @@ public class HTTPClient {
 	public InputStream sendHTTPRequestMessage() throws IOException {
 		HTTPRequestMessage httpRequest = getRequestMessage();
 		// Create a socket to the given URI at the given port.
-		if (getRequestMessage().getHTTPVersion() == "HTTP/1.0") {
-			clientSocket = new Socket(host, port);
-		}		
+		if (getRequestMessage().getHTTPVersion().contains("1.0")) {
+			setClientSocket(new Socket(getHost(), getPort()));
+		}
 
 		// Create an output stream (convenient data writer) to this host.
 		DataOutputStream outToServer = new DataOutputStream(
-				clientSocket.getOutputStream());
+				getClientSocket().getOutputStream());
 
 		// Create an input stream (convenient data reader) to this host and wrap
 		// a buffered input stream around the input stream for increased 
 		// efficiency.
-		InputStream inFromServer = clientSocket.getInputStream();
+		InputStream inFromServer = getClientSocket().getInputStream();
 
 		// Compose HTTP request message and send to the server.
 		outToServer.writeBytes(httpRequest.composeMessage());
+		outToServer.flush();
 		System.out.println("message send: \n"
 				+ httpRequest.composeMessage().trim() + "\nto " + host + ":"
 				+ port);
@@ -242,56 +255,43 @@ public class HTTPClient {
 				if (uri.getHost().contentEquals(host)) {
 					getRequestMessage().setMethod(HTTPMethod.GET);
 					getRequestMessage().setLocalPathRequest(uri.getPath());
+					File file = new File(getWorkingDirectory() + "/" + getHost()
+							+ getRequestMessage().getLocalPathRequest());
+					if (file.exists()) {
+						getRequestMessage().setIfModifiedSinceHeader(new Date(file.lastModified()));
+					} else {
+						getRequestMessage().removeAsHeader("If-Modified-Since");
+					}
 					InputStream inFromServer = sendHTTPRequestMessage();
 					parseHTTPMessage(inFromServer);
 				}
-			} catch (URISyntaxException | IOException e) {
+			} catch (URISyntaxException | IOException | InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
 
 	}
 	
-	private void parseTextMessageBody(BufferedReader inFromServer)
-			throws IOException {
-		File file = new File(workingDirectory + "/" + host
-				+ responseMessage.getPathRequestedResource());
-		System.out.println(workingDirectory + "/" + host
-				+ responseMessage.getPathRequestedResource());
-		if (!file.exists()) {
-			file.getParentFile().mkdirs();
-			file.createNewFile();
-		}
-		FileWriter fw = new FileWriter(file.getAbsoluteFile());
-		BufferedWriter bw = new BufferedWriter(fw);
-		String response;
-		while ((response = inFromServer.readLine()) != null) {
-			System.out.println(response);
-			responseMessage.addToMessageBody(response);
-			bw.write(response + "\n");
-		}
-		bw.close();
-		System.out.println("End of stream");
-
-	}
-	
-	private void parseBinaryMessageBody(BufferedInputStream inStream)
-			throws IOException {
-		File file = new File(workingDirectory + "/" + host
-				+ responseMessage.getPathRequestedResource());
+	private void parseBodyMessage(BufferedInputStream inStream) throws IOException {
+		File file = new File(getWorkingDirectory() + "/" + getHost()
+				+ getResponseMessage().getPathRequestedResource());
 		if (!file.exists()) {
 			file.getParentFile().mkdirs();
 			file.createNewFile();
 		}
 		FileOutputStream fos = new FileOutputStream(file.getAbsoluteFile());
 		BufferedOutputStream outStream = new BufferedOutputStream(fos);
+		boolean text = responseMessage.containsTextFile();
 		byte[] buffer = new byte[1024];
-		int bytesRead = 0;
 		boolean endOfHeaderFound = false;
+		int bytesToRead = Integer.parseInt(getResponseMessage().getHeaderValue(
+				"Content-Length"));
 		int headerBytesRead;
-		while ((bytesRead = inStream.read(buffer)) != -1) {
+		int bodyBytesRead = 0;
+		int bytesRead;
+		while (bodyBytesRead < bytesToRead) {
+			bytesRead = inStream.read(buffer);
 			headerBytesRead = 0;
-			System.out.println("[Notice] " + bytesRead +" bytes read to buffer");
 			if (!endOfHeaderFound) {
 				String string = new String(buffer, 0, bytesRead);
 				int indexOfEndOfHeader = string.indexOf("\r\n\r\n");
@@ -302,12 +302,22 @@ public class HTTPClient {
 					bytesRead = 0;
 				}
 			}
+			if (text) {
+				// Only display the part of the buffer that is actually written.
+				byte [] subArray = Arrays.copyOfRange(buffer, headerBytesRead, bytesRead);
+				String textToDisplay = new String(subArray);
+				System.out.println(textToDisplay);
+				responseMessage.addToMessageBody(textToDisplay);
+			} else {
+				System.out.println("[Notice] " + bytesRead +" bytes read to buffer");
+			}
+			bodyBytesRead += bytesRead - headerBytesRead;
 			outStream.write(buffer, headerBytesRead, bytesRead-headerBytesRead);
 			outStream.flush();
 		}
 		outStream.close();
 		fos.close();
-		System.out.println("End of stream");
+		System.out.println("[Notice] end of stream");
 	}
 
 }

@@ -36,7 +36,11 @@ public class HTTPResponseMessage extends HTTPMessage {
 	private String reasonPhrase;
 	
 	public String getPathRequestedResource() {
-		return pathRequestedResource;
+		if (pathRequestedResource.contentEquals("/")) {
+			return "/index.html";
+		} else {
+			return pathRequestedResource;
+		}
 	}
 	
 	public void setPathRequestedResource(String path) {

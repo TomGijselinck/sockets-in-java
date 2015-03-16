@@ -1,0 +1,30 @@
+TEST FOR "If-Modified-Since" HEADER
+------------------------------------
+www.example.com
+1.0 ok
+1.1 ok
+
+www.tcpipguide.com
+1.0 x
+1.1 x
+
+www.jmarshall.com
+1.0 x
+1.1 x
+
+www.tldp.org
+1.0 ok
+1.1 ok
+
+www.tinyos.net
+1.0 ok
+1.1 ok
+
+www.linux-ip.net
+1.0 ok
+1.1 ok
+
+www.puppylinux.com
+1.0 ok
+1.1 ok
+(!): buffer reset werkt niet (markpos->-1)
