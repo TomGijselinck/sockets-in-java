@@ -1,11 +1,7 @@
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.logging.SimpleFormatter;
 
 /**
  * A class of HTTP request messages as special kind of HTTP messages involving
