@@ -187,8 +187,10 @@ public class HTTPClient {
 			responseMessage.addAsHeader(header[0], header[1]);
 		}
 		
-		// parse message body
-		if (responseMessage.getResponseStatusCode() == 304) {
+		// parse message body if it exists
+		if (getRequestMessage().getMethod() == HTTPMethod.HEAD) {
+			// no message body, do nothing
+		} else if (responseMessage.getResponseStatusCode() == 304) {
 			System.out.println("[Notice] requested resource not modified");
 		} else if (responseMessage.containsTextFile()) {
 			System.out.println("[Notice] message body is text");
