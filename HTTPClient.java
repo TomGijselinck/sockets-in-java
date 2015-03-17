@@ -30,7 +30,7 @@ public class HTTPClient {
 		
 		// Create the first request message using the given arguments.
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
-				"/", HTTPversion);
+				"/index.html", HTTPversion);
 		request.addAsHeader("Host", testClient.getHost());
 		if (method.equals(HTTPMethod.GET)) {
 			File file = new File(testClient.workingDirectory + "/"
@@ -311,7 +311,7 @@ public class HTTPClient {
 				System.out.println(textToDisplay);
 				responseMessage.addToMessageBody(textToDisplay);
 			} else {
-				System.out.println("[Notice] " + bytesRead +" bytes read to buffer");
+				System.out.println("[Notice] " + bytesRead +" bytes read from buffer");
 			}
 			bodyBytesRead += bytesRead - headerBytesRead;
 			outStream.write(buffer, headerBytesRead, bytesRead-headerBytesRead);

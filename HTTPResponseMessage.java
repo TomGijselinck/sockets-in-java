@@ -1,3 +1,10 @@
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Map;
+import java.util.TimeZone;
+
+import org.apache.commons.io.FilenameUtils;
+
 
 public class HTTPResponseMessage extends HTTPMessage {
 
@@ -54,7 +61,7 @@ public class HTTPResponseMessage extends HTTPMessage {
 	}
 	
 	private void parseStatusLine(String statusLine) {
-		String[] splitString = statusLine.split(" ");
+		String[] splitString = statusLine.split(" ", 3);
 		setHTTPVersion(splitString[0]);
 		setResponseStatusCode(Integer.parseInt(splitString[1]));
 		setReasonPhrase(splitString[2]);
@@ -62,6 +69,33 @@ public class HTTPResponseMessage extends HTTPMessage {
 	
 	public void setStatusLine(String statusLine) {
 		parseStatusLine(statusLine);
+	}
+	
+	public void setDate(Date date) {
+		SimpleDateFormat dateFormat = 
+				new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+		dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+		addAsHeader("Date", dateFormat.format(date));
+	}
+
+	public String composeMessage() {
+		String message = getStatusLine() + "\r\n";
+		//loop over all headers and add them to message
+		for (Map.Entry<String, String> entry : getHeaders().entrySet()) {
+			String header = entry.getKey() + ": " + entry.getValue() + "\r\n";
+			message += header;
+		}
+		message += "\r\n";
+		return message;
+	}
+
+	public void setContentType(String localPathRequest) {
+		String fileType = FilenameUtils.getExtension(localPathRequest);
+		if (fileType.contentEquals("html") || fileType.contentEquals("htm")) {
+			addAsHeader("Content-Type", "text/html");
+		} else {
+			addAsHeader("Content-Type", fileType);
+		}
 	}
 
 }

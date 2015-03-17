@@ -20,6 +20,10 @@ public class HTTPRequestMessage extends HTTPMessage {
 		setLocalPathRequest(pathRequestedResource);
 		setHTTPVersion(HTTPVersion);
 	}
+	
+	public HTTPRequestMessage() {
+		super();
+	}
 
 	public HTTPMethod getMethod() {
 		return method;
@@ -60,9 +64,20 @@ public class HTTPRequestMessage extends HTTPMessage {
 	}
 
 	private HTTPClient client;
-
+	
 	public String getRequestLine() {
 		return method + " " + localPathRequest + " " + HTTPVersion;
+	}
+	
+	public void setRequestLine(String request) {
+		parseRequestLine(request);
+	}
+
+	private void parseRequestLine(String requestLine) {
+		String[] splitString = requestLine.split(" ", 3);
+		setMethod(HTTPMethod.parseMethod(splitString[0]));
+		setLocalPathRequest(splitString[1]);
+		setHTTPVersion(splitString[2]);
 	}
 
 	public String composeMessage() {
