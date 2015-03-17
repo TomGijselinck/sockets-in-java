@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.text.ParseException;
 import java.util.Date;
 
 
@@ -45,24 +46,35 @@ public class Handler implements Runnable {
 				} else if (method == HTTPMethod.GET) {
 					File file = new File(serverDirectory + getHTTPRequestMessage().getLocalPathRequest());
 					if (file.exists()) {
-						response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+						if (requestMessage.hasAsHeader("If-Modified-Since")) {
+							Date fileDate = new Date(file.lastModified());
+							Date ifModifiedSinceDate = requestMessage.getIfModifiedSinceDate();
+							if (ifModifiedSinceDate.after(fileDate)) {
+								response.setStatusLine(requestMessage.getHTTPVersion() + " 304 Not Modified");
+								response.setLastModifiedHeader(fileDate);
+							} else {
+								response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+							}							
+						} else {
+							response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+						}
 						response.setContentType(requestMessage.getLocalPathRequest());
 						response.addAsHeader("Content-Length", String.valueOf(file.length()));
 						setHTTPResponseMessage(response);
 						sendResponseMessage();
-						BufferedInputStream fileStream = new BufferedInputStream(getFileStream(file));
-						sendFile(fileStream);
+						if (responseMessage.getResponseStatusCode() == 200) {
+							BufferedInputStream fileStream = new BufferedInputStream(getFileStream(file));
+							sendFile(fileStream);
+						}
 					} else {
 						response.setStatusLine(requestMessage.getHTTPVersion() + " 404 Not found");
+						setHTTPResponseMessage(response);
+						sendResponseMessage();
 					}
 				}
-	
-				// Create the first response message.
-	//			setHTTPResponseMessage(composeHTTPResponseMessage());
-	//			sendResponseMessage();
 				
 			}
-		} catch (IOException e) {
+		} catch (IOException | ParseException e) {
 			e.printStackTrace();
 		}
 	}

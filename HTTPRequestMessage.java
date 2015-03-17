@@ -1,3 +1,5 @@
+import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
@@ -97,6 +99,14 @@ public class HTTPRequestMessage extends HTTPMessage {
 		dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
 		addAsHeader("If-Modified-Since", dateFormat.format(date));
 		
+	}
+	
+	public Date getIfModifiedSinceDate() throws ParseException {
+		String dateString = getHeaderValue("If-Modified-Since");
+		SimpleDateFormat dateFormat = 
+				new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+		Date date = dateFormat.parse(dateString);
+		return date;
 	}
 
 }

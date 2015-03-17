@@ -97,5 +97,12 @@ public class HTTPResponseMessage extends HTTPMessage {
 			addAsHeader("Content-Type", fileType);
 		}
 	}
+	
+	public void setLastModifiedHeader(Date date) {
+		SimpleDateFormat dateFormat = 
+				new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+		dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+		addAsHeader("Last-Modified", dateFormat.format(date));
+	}
 
 }
