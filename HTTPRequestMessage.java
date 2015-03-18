@@ -1,4 +1,3 @@
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -107,6 +106,14 @@ public class HTTPRequestMessage extends HTTPMessage {
 				new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 		Date date = dateFormat.parse(dateString);
 		return date;
+	}
+
+	public boolean isHTTP1_0() {
+		return getHTTPVersion().contains("1.0");
+	}
+	
+	public boolean isHTTP1_1() {
+		return getHTTPVersion().contains("1.1");
 	}
 
 }

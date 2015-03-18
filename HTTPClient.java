@@ -39,7 +39,7 @@ public class HTTPClient {
 				request.setIfModifiedSinceHeader(new Date(file.lastModified()));
 			}
 		}
-		if (HTTPversion.contains("1.1")) {
+		if (HTTPversion.contains("1.1")) { //TODO require this header?
 			request.addAsHeader("Connection", "Keep-Alive");
 		}
 		testClient.setHTTPRequestMessage(request);
@@ -168,8 +168,8 @@ public class HTTPClient {
 		System.out.println("================RESPONSE================");
 		
 		// Set the current point in the stream as the return point with a 
-		// maximum possible read data of 3072 bytes before the mark is given up.
-		bis.mark(10*1024); // less results in lost mark point
+		// maximum possible read data of 10240 bytes before the mark is given up.
+		bis.mark(1024*1024); // to be sure mark point is not lost
 		String statusLine = serverResponseText.readLine();
 		responseMessage.setStatusLine(statusLine);
 		System.out.println(responseMessage.getStatusLine());
@@ -202,9 +202,9 @@ public class HTTPClient {
 			parseBodyMessage(bis);
 		}
 		
-		if (getRequestMessage().getHTTPVersion().contains("1.0")) {
+		if (getRequestMessage().isHTTP1_0()) {
 			getClientSocket().close();
-		} else if (getRequestMessage().getHTTPVersion().contains("1.1")) {
+		} else if (getRequestMessage().isHTTP1_1()) {
 			getClientSocket().setKeepAlive(true);
 		}
 		System.out.println("");
@@ -220,7 +220,7 @@ public class HTTPClient {
 	public InputStream sendHTTPRequestMessage() throws IOException {
 		HTTPRequestMessage httpRequest = getRequestMessage();
 		// Create a socket to the given URI at the given port.
-		if (getRequestMessage().getHTTPVersion().contains("1.0")) {
+		if (getRequestMessage().isHTTP1_0()) {
 			setClientSocket(new Socket(getHost(), getPort()));
 		}
 
