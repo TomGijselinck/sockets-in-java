@@ -1,6 +1,5 @@
 import java.io.*;
 import java.net.Socket;
-import java.text.ParseException;
 import java.util.Date;
 
 
@@ -19,63 +18,77 @@ public class Handler implements Runnable {
 	public void run() {
 		BufferedReader inFromClient;
 		try {
-			System.out.println(hash + " Start new run");
-			// Create inputstream (convenient data reader) to this host.
-			InputStreamReader inputStreamReader = 
-					new InputStreamReader(socket.getInputStream());
-			inFromClient = new BufferedReader(inputStreamReader);	
-			
-			parseRequestMessage(inFromClient);
-			if (requestAccepted) {
-				HTTPResponseMessage response = new HTTPResponseMessage();
-				response.setDate(new Date());
-				HTTPMethod method = getHTTPRequestMessage().getMethod();
-				if (method == HTTPMethod.POST) {
-					//do something
-				} else if (method == HTTPMethod.PUT) {
-					//do something else
-				} else if (method == HTTPMethod.HEAD) {
-					File file = new File(serverDirectory + getHTTPRequestMessage().getLocalPathRequest());
-					if (file.exists()) {
-						response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
-					} else {
-						response.setStatusLine(requestMessage.getHTTPVersion() + " 404 Not found");
-					}
-					setHTTPResponseMessage(response);
-					sendResponseMessage();
-				} else if (method == HTTPMethod.GET) {
-					File file = new File(serverDirectory + getHTTPRequestMessage().getLocalPathRequest());
-					if (file.exists()) {
-						if (requestMessage.hasAsHeader("If-Modified-Since")) {
-							Date fileDate = new Date(file.lastModified());
-							Date ifModifiedSinceDate = requestMessage.getIfModifiedSinceDate();
-							if (ifModifiedSinceDate.after(fileDate)) {
-								response.setStatusLine(requestMessage.getHTTPVersion() + " 304 Not Modified");
-								response.setLastModifiedHeader(fileDate);
+			while (!socket.isClosed()){
+				System.out.println(hash + " Start new run");
+				// Create inputstream (convenient data reader) to this host.
+				InputStreamReader inputStreamReader = 
+						new InputStreamReader(socket.getInputStream());
+				inFromClient = new BufferedReader(inputStreamReader);	
+				
+				parseRequestMessage(inFromClient);
+				if (requestAccepted) {			
+					HTTPResponseMessage response = new HTTPResponseMessage();
+					response.setDate(new Date());
+					HTTPMethod method = getHTTPRequestMessage().getMethod();
+					if (method == HTTPMethod.POST) {
+						//do something
+					} else if (method == HTTPMethod.PUT) {
+						//do something else
+					} else if (method == HTTPMethod.HEAD) {
+						File file = new File(serverDirectory + getHTTPRequestMessage().getLocalPathRequest());
+						if (file.exists()) {
+							response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+						} else {
+							response.setStatusLine(requestMessage.getHTTPVersion() + " 404 Not found");
+						}
+						setHTTPResponseMessage(response);
+						sendResponseMessage();
+					} else if (method == HTTPMethod.GET) {
+						File file = new File(serverDirectory + getHTTPRequestMessage().getLocalPathRequest());
+						if (file.exists()) {
+							if (requestMessage.hasAsHeader("If-Modified-Since")) {
+								Date fileDate = new Date(file.lastModified());
+								Date ifModifiedSinceDate = requestMessage.getIfModifiedSinceDate();
+								if (ifModifiedSinceDate.after(fileDate)) {
+									response.setStatusLine(requestMessage.getHTTPVersion() + " 304 Not Modified");
+									response.setLastModifiedHeader(fileDate);
+								} else {
+									response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+								}							
 							} else {
 								response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
-							}							
+							}
+							if (requestMessage.isHTTP1_1()) {
+								response.addAsHeader("Connection", "Keep-Alive");
+							}
+							response.setContentType(requestMessage.getLocalPathRequest());
+							response.addAsHeader("Content-Length", String.valueOf(file.length()));
+							setHTTPResponseMessage(response);
+							sendResponseMessage();
+							if (responseMessage.getResponseStatusCode() == 200) {
+								BufferedInputStream fileStream = new BufferedInputStream(getFileStream(file));
+								sendFile(fileStream);
+							}
 						} else {
-							response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+							response.setStatusLine(requestMessage.getHTTPVersion() + " 404 Not found");
+							setHTTPResponseMessage(response);
+							sendResponseMessage();
 						}
-						response.setContentType(requestMessage.getLocalPathRequest());
-						response.addAsHeader("Content-Length", String.valueOf(file.length()));
-						setHTTPResponseMessage(response);
-						sendResponseMessage();
-						if (responseMessage.getResponseStatusCode() == 200) {
-							BufferedInputStream fileStream = new BufferedInputStream(getFileStream(file));
-							sendFile(fileStream);
-						}
-					} else {
-						response.setStatusLine(requestMessage.getHTTPVersion() + " 404 Not found");
-						setHTTPResponseMessage(response);
-						sendResponseMessage();
+					}
+					if (requestMessage.isHTTP1_0()) {
+						socket.close();
 					}
 				}
-				
+//				Thread.sleep(100); //TODO adjust + set timeout
 			}
-		} catch (IOException | ParseException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
+			try {
+				responseMessage.setStatusLine(requestMessage.getHTTPVersion() + " 500 Server Error");
+				sendResponseMessage();
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
 		}
 	}
 	
@@ -144,11 +157,13 @@ public class Handler implements Runnable {
 	 * @throws IOException 
 	 */
 	private void parseRequestMessage(BufferedReader inFromClient) throws IOException {
+		requestMessage = new HTTPRequestMessage();
 		String requestLine = inFromClient.readLine();
 		System.out.println(hash + " Request line: " + requestLine);
 		if (requestLine == null) {
 			requestAccepted = false;
-			System.out.println(hash + " --> Ignoring this connection");
+			socket.close();
+			System.out.println(hash + " --> Closing this connection");
 		} else {
 			requestAccepted = true;
 			requestMessage.setRequestLine(requestLine);
@@ -209,6 +224,7 @@ public class Handler implements Runnable {
 		byte[] buffer = new byte[1024];
 		while ((bytesRead = fileStream.read(buffer)) != -1) {
 			outToClient.write(buffer);
+			buffer = new byte[1024];
 			System.out.println("[Notice] " + bytesRead +" bytes written to buffer");
 		}
 		outToClient.flush();
