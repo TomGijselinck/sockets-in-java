@@ -1,3 +1,4 @@
+package HTTP.message;
 /**
  * An enumeration introducing different HTTP methods used to express
  * HTTP methods used in HTTP request status lines.

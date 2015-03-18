@@ -1,6 +1,11 @@
+package HTTP.server;
 import java.io.*;
 import java.net.Socket;
 import java.util.Date;
+
+import HTTP.message.HTTPMethod;
+import HTTP.message.HTTPRequestMessage;
+import HTTP.message.HTTPResponseMessage;
 
 
 public class Handler implements Runnable {

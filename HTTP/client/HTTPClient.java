@@ -1,3 +1,4 @@
+package HTTP.client;
 import java.io.*;
 import java.net.*;
 import java.util.Arrays;
@@ -7,6 +8,10 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import HTTP.message.HTTPMethod;
+import HTTP.message.HTTPRequestMessage;
+import HTTP.message.HTTPResponseMessage;
 
 public class HTTPClient {
 
@@ -23,10 +28,16 @@ public class HTTPClient {
 			System.exit(1);
 		}
 		String HTTPversion = args[3];
+		String clientName;
+		if (args.length == 5) {
+			clientName = "/" + args[4];
+		} else {
+			clientName = "";
+		}
 		
 		// Create an instance of this class to enable bidirectional 
 		// communication using HTTP.
-		HTTPClient testClient = new HTTPClient(uri.getHost(), port);
+		HTTPClient testClient = new HTTPClient(uri.getHost(), port, clientName);
 		
 		// Create the first request message using the given arguments.
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
@@ -61,11 +72,15 @@ public class HTTPClient {
 		
 
 	}
-
-	public HTTPClient(String host, int port) {
+	
+	public HTTPClient(String host, int port, String clientName) {
 		setHost(host);
 		setPort(port);
-		setWorkingDirectory("/home/tom/http");
+		setWorkingDirectory("/home/tom/http" + clientName);
+	}
+
+	public HTTPClient(String host, int port) {
+		this(host, port, "");
 	}
 
 	public HTTPRequestMessage getRequestMessage() {

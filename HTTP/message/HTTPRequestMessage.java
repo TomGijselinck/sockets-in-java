@@ -1,8 +1,11 @@
+package HTTP.message;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
+
+import HTTP.client.HTTPClient;
 
 /**
  * A class of HTTP request messages as special kind of HTTP messages involving

@@ -1,12 +1,14 @@
+package HTTP.server;
 import java.net.*;
 import java.util.HashSet;
 import java.util.Set;
+
 
 public class HTTPServer {
 	private static ServerSocket welcomeSocket;
 
 	public static void main(String argv[]) throws Exception {
-		// Create server (incoming) socket on port 6789.
+		// Create server (incoming) socket on port 5678.
 		welcomeSocket = new ServerSocket();
 		welcomeSocket.setReuseAddress(true);
 		welcomeSocket.bind(new InetSocketAddress(5678));

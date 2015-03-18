@@ -1,9 +1,13 @@
+package tests;
 import static org.junit.Assert.*;
 
 import java.util.Date;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import HTTP.message.HTTPMethod;
+import HTTP.message.HTTPRequestMessage;
 
 public class HTTPRequestMessageTest {
 
