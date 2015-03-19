@@ -45,18 +45,23 @@ public class Handler implements Runnable {
 					}
 					
 					// Resolve different HTTP methods; HEAD, GET, PUT, POST
-					if (method == HTTPMethod.POST) {
+					if (method == HTTPMethod.POST || method == HTTPMethod.PUT) {
+						boolean append = false;
 						String fileName = FilenameUtils.getName(getLocalPathRequest());
-						String fullFileName;
+						String fullFileName = "";
 						if (fileName.contentEquals("") || fileName.contains("index.html")) {
 							String fileDirectory = FilenameUtils.getFullPath(getLocalPathRequest());
-							fullFileName = serverDirectory + fileDirectory + "POST.txt";
-							System.out.println(fullFileName);
+							if (method == HTTPMethod.POST) {
+								fullFileName = serverDirectory + fileDirectory + "POST.txt";
+								append = true;
+							} else if (method == HTTPMethod.PUT) {
+								fullFileName = serverDirectory + fileDirectory + "PUT.txt";
+								append = false;
+							}
 						} else {
 							fullFileName = serverDirectory + getLocalPathRequest();
-							System.out.println(fullFileName);
 						}
-						FileWriter fw = new FileWriter(fullFileName, true);
+						FileWriter fw = new FileWriter(fullFileName, append);
 						fw.write(getHTTPRequestMessage().getMessageBody());
 						fw.close();
 						response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");

@@ -48,9 +48,11 @@ public class HTTPClient {
 				requestUri, HTTPversion);
 		request.addAsHeader("Host", testClient.getHost());
 		request.addAsHeader("From", clientName + "@localhost");
-		if (method.equals(HTTPMethod.POST)) {
+		if (method.equals(HTTPMethod.POST) || method == HTTPMethod.PUT) {
+			if (request.getLocalPathRequest().contains("index.html")) {
+				request.setLocalPathRequest("/");
+			}
 			request.addAsHeader("Content-Type", "text/plain");
-//			request.addAsHeader("Content-Length", "0"); //TODO aanpassen aan user input
 			try {
 				InputStream in = System.in;
 				InputStreamReader charsIn = new InputStreamReader(in);
@@ -221,9 +223,10 @@ public class HTTPClient {
 		}
 		
 		// parse message body if it exists
-		if (getRequestMessage().getMethod() == HTTPMethod.HEAD) {
+		HTTPMethod method = getRequestMessage().getMethod();
+		if (method == HTTPMethod.HEAD) {
 			// no message body, do nothing
-		} else if (getRequestMessage().getMethod() == HTTPMethod.POST) {
+		} else if (method == HTTPMethod.POST || method == HTTPMethod.PUT) {
 			// no message body, do nothing
 		} else if (responseMessage.getResponseStatusCode() == 304) {
 			System.out.println("[Notice] requested resource not modified");
