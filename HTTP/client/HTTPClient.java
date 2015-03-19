@@ -230,6 +230,8 @@ public class HTTPClient {
 			// no message body, do nothing
 		} else if (getResponseMessage().getResponseStatusCode() == 400) {
 			// bad request, no message body, do nothing
+		} else if (getResponseMessage().getResponseStatusCode() == 404) {
+			// Not found, no message body, do nothing
 		} else if (responseMessage.getResponseStatusCode() == 304) {
 			System.out.println("[Notice] requested resource not modified");
 		} else if (responseMessage.containsTextFile()) {

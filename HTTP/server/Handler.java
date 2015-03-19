@@ -118,11 +118,12 @@ public class Handler implements Runnable {
 							}
 						} else {
 							response.setStatusLine(HTTPVersion + " 404 Not found");
+							response.addAsHeader("Connection", "close");
 							setHTTPResponseMessage(response);
 							sendResponseMessage();
 						}
 					}
-					if (getHTTPRequestMessage().isHTTP1_0() || getHTTPRequestMessage().hasAsHeaderValue(
+					if (getHTTPRequestMessage().isHTTP1_0() || getHTTPResponseMessage().hasAsHeaderValue(
 									"Connection", "close")) {
 						System.out.println(hash + " --> Closing this connection");
 						getSocket().close();
