@@ -46,7 +46,7 @@ public class HTTPClient {
 		}
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
 				requestUri, HTTPversion);
-//		request.addAsHeader("Host", testClient.getHost());
+		request.addAsHeader("Host", testClient.getHost());
 		request.addAsHeader("From", clientName + "@localhost");
 		if (method.equals(HTTPMethod.POST) || method == HTTPMethod.PUT) {
 			if (request.getLocalPathRequest().contains("index.html")) {

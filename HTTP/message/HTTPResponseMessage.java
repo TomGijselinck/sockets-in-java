@@ -95,7 +95,7 @@ public class HTTPResponseMessage extends HTTPMessage {
 		if (fileType.contentEquals("html") || fileType.contentEquals("htm")) {
 			addAsHeader("Content-Type", "text/html");
 		} else {
-			addAsHeader("Content-Type", fileType);
+			addAsHeader("Content-Type", "image/" + fileType);
 		}
 	}
 	
