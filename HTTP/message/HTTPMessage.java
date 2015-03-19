@@ -19,6 +19,14 @@ public abstract class HTTPMessage {
 	public boolean hasAsHeader(String header) {
 		return headers.containsKey(header);
 	}
+
+	public boolean hasAsHeaderValue(String header, String value) {
+		if (hasAsHeader(header)) {
+			return headers.get(header).contentEquals(value);
+		} else {
+			return false;
+		}
+	}
 	
 	public String getHeaderValue(String header) {
 		if(headers.containsKey(header)) {
