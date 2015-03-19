@@ -22,7 +22,7 @@ public abstract class HTTPMessage {
 
 	public boolean hasAsHeaderValue(String header, String value) {
 		if (hasAsHeader(header)) {
-			return headers.get(header).contentEquals(value);
+			return headers.get(header).trim().contentEquals(value);
 		} else {
 			return false;
 		}
