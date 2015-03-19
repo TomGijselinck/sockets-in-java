@@ -92,6 +92,7 @@ public class HTTPRequestMessage extends HTTPMessage {
 			message += header;
 		}
 		message += "\r\n";
+		message += getMessageBody() + "\n";
 		return message;
 	}
 	
