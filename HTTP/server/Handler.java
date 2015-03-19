@@ -134,9 +134,14 @@ public class Handler implements Runnable {
 					} catch (InterruptedException ie) {}
 					timer += DELAY;
 					if (timer >= TIMEOUT) {
-						System.out.println("[Notice] timeout occured");
-						System.out.println(hash + " --> Closing this connection");
-						getSocket().close();
+						if (!getHTTPRequestMessage().getRequestLine().contains("HTTP")) {
+							// this thread is never used
+							getSocket().close();
+						} else {
+							System.out.println("[Notice] timeout occured");
+							System.out.println(hash + " --> Closing this connection");
+							getSocket().close();							
+						}
 					}
 				}
 			}
