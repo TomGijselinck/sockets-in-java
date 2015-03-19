@@ -30,28 +30,46 @@ public class HTTPClient {
 		String HTTPversion = args[3];
 		String clientName;
 		if (args.length == 5) {
-			clientName = "/" + args[4];
+			clientName = args[4];
 		} else {
-			clientName = "";
+			clientName = "omega";
 		}
 		
 		// Create an instance of this class to enable bidirectional 
 		// communication using HTTP.
-		HTTPClient testClient = new HTTPClient(uri.getHost(), port, clientName);
+		HTTPClient testClient = new HTTPClient(uri.getHost(), port, "/" + clientName);
 		
 		// Create the first request message using the given arguments.
+		String requestUri = uri.getPath();
+		if (requestUri.contentEquals("")) {
+			requestUri = "/index.html";
+		}
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
-				"/index.html", HTTPversion);
+				requestUri, HTTPversion);
 		request.addAsHeader("Host", testClient.getHost());
+		request.addAsHeader("From", clientName + "@localhost");
+		if (method.equals(HTTPMethod.POST)) {
+			request.addAsHeader("Content-Type", "text/plain");
+//			request.addAsHeader("Content-Length", "0"); //TODO aanpassen aan user input
+			try {
+				InputStream in = System.in;
+				InputStreamReader charsIn = new InputStreamReader(in);
+				BufferedReader bufferedCharsIn = new BufferedReader(charsIn);
+				String line = bufferedCharsIn.readLine();
+				request.setMessageBody(line);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 		if (method.equals(HTTPMethod.GET)) {
 			File file = new File(testClient.workingDirectory + "/"
 					+ testClient.host + "/index.html");
 			if (file.exists()) {
 				request.setIfModifiedSinceHeader(new Date(file.lastModified()));
 			}
-		}
-		if (HTTPversion.contains("1.1")) { //TODO require this header?
-			request.addAsHeader("Connection", "Keep-Alive");
+			if (HTTPversion.contains("1.1")) { //TODO require this header?
+				request.addAsHeader("Connection", "Keep-Alive");
+			}
 		}
 		testClient.setHTTPRequestMessage(request);
 		
@@ -205,6 +223,8 @@ public class HTTPClient {
 		// parse message body if it exists
 		if (getRequestMessage().getMethod() == HTTPMethod.HEAD) {
 			// no message body, do nothing
+		} else if (getRequestMessage().getMethod() == HTTPMethod.POST) {
+			// no message body, do nothing
 		} else if (responseMessage.getResponseStatusCode() == 304) {
 			System.out.println("[Notice] requested resource not modified");
 		} else if (responseMessage.containsTextFile()) {
@@ -219,8 +239,6 @@ public class HTTPClient {
 		
 		if (getRequestMessage().isHTTP1_0()) {
 			getClientSocket().close();
-		} else if (getRequestMessage().isHTTP1_1()) {
-			getClientSocket().setKeepAlive(true);
 		}
 		System.out.println("");
 	}
@@ -251,6 +269,7 @@ public class HTTPClient {
 		// Compose HTTP request message and send to the server.
 		outToServer.writeBytes(httpRequest.composeMessage());
 		outToServer.flush();
+//		getClientSocket().shutdownInput(); // Places the input stream for this socket at "end of stream"
 		System.out.println("message send: \n"
 				+ httpRequest.composeMessage().trim() + "\nto " + host + ":"
 				+ port);
@@ -266,6 +285,7 @@ public class HTTPClient {
 		// path embedded objects using a HTTP GET request message.
 		Elements links = doc.select("img[src]");
 		if (links.isEmpty()) {System.out.println("[Notice] no embedded images");}
+		int numberOfObjectsRequested = 0;
 		for (Element link : links) {
 			try {
 				URI uri = new URI(link.attr("abs:src"));
@@ -279,8 +299,14 @@ public class HTTPClient {
 					} else {
 						getRequestMessage().removeAsHeader("If-Modified-Since");
 					}
+					// Add "Connection: close" as header to indicate last 
+					// request message.
+					if (numberOfObjectsRequested +1 == links.size() && getRequestMessage().isHTTP1_1()) {
+						getRequestMessage().addAsHeader("Connection", "close");
+					}
 					InputStream inFromServer = sendHTTPRequestMessage();
 					parseHTTPMessage(inFromServer);
+					numberOfObjectsRequested += 1;
 				}
 			} catch (URISyntaxException | IOException | InterruptedException e) {
 				e.printStackTrace();
