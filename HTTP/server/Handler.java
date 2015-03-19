@@ -46,7 +46,7 @@ public class Handler implements Runnable {
 					}
 					
 					if (getHTTPRequestMessage().isHTTP1_1()) {
-						if (!getHTTPRequestMessage().hasAsHeader("host")) {
+						if (!getHTTPRequestMessage().hasAsHeader("Host")) {
 							response.setStatusLine(HTTPVersion + " 400 Bad Request");
 							setHTTPResponseMessage(response);
 							sendResponseMessage();
@@ -79,8 +79,6 @@ public class Handler implements Runnable {
 						response.setStatusLine(HTTPVersion + " 200 OK");
 						setHTTPResponseMessage(response);
 						sendResponseMessage();
-					} else if (method == HTTPMethod.PUT) {
-						//do something else
 					} else if (method == HTTPMethod.HEAD) {
 						File file = new File(serverDirectory + getLocalPathRequest());
 						if (file.exists()) {
@@ -107,7 +105,7 @@ public class Handler implements Runnable {
 							} else {
 								response.setStatusLine(HTTPVersion + " 200 OK");
 							}
-							if (getHTTPRequestMessage().isHTTP1_1()) {
+							if (getHTTPRequestMessage().isHTTP1_1() && !response.hasAsHeaderValue("Connection", "close")) {
 								response.addAsHeader("Connection", "Keep-Alive");
 							}
 							response.setContentType(getLocalPathRequest());
@@ -126,6 +124,7 @@ public class Handler implements Runnable {
 					}
 					if (getHTTPRequestMessage().isHTTP1_0() || getHTTPRequestMessage().hasAsHeaderValue(
 									"Connection", "close")) {
+						System.out.println(hash + " --> Closing this connection");
 						getSocket().close();
 					}
 				} else {
