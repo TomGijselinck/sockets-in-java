@@ -3,6 +3,8 @@ import java.io.*;
 import java.net.Socket;
 import java.util.Date;
 
+import org.apache.commons.io.FilenameUtils;
+
 import HTTP.message.HTTPMethod;
 import HTTP.message.HTTPRequestMessage;
 import HTTP.message.HTTPResponseMessage;
@@ -22,51 +24,76 @@ public class Handler implements Runnable {
 	@Override
 	public void run() {
 		BufferedReader inFromClient;
+		int timer = 0;
+		int DELAY = 10;
+		int TIMEOUT = 2000; // 10 seconds
 		try {
 			while (!socket.isClosed()){
-				System.out.println(hash + " Start new run");
 				// Create inputstream (convenient data reader) to this host.
 				InputStreamReader inputStreamReader = 
-						new InputStreamReader(socket.getInputStream());
+						new InputStreamReader(getSocket().getInputStream());
 				inFromClient = new BufferedReader(inputStreamReader);	
 				
 				parseRequestMessage(inFromClient);
-				if (requestAccepted) {			
+				if (requestAccepted) {
+					timer = 0;
 					HTTPResponseMessage response = new HTTPResponseMessage();
 					response.setDate(new Date());
 					HTTPMethod method = getHTTPRequestMessage().getMethod();
+					if (getHTTPRequestMessage().hasAsHeaderValue("Connection", "close")) {
+						response.addAsHeader("Connection", "close");
+					}
+					
+					// Resolve different HTTP methods; HEAD, GET, PUT, POST
 					if (method == HTTPMethod.POST) {
-						//do something
+						String fileName = FilenameUtils.getName(getLocalPathRequest());
+						String fullFileName;
+						if (fileName.contentEquals("") || fileName.contains("index.html")) {
+							String fileDirectory = FilenameUtils.getFullPath(getLocalPathRequest());
+							fullFileName = serverDirectory + fileDirectory + "POST.txt";
+							System.out.println(fullFileName);
+						} else {
+							fullFileName = serverDirectory + getLocalPathRequest();
+							System.out.println(fullFileName);
+						}
+						FileWriter fw = new FileWriter(fullFileName, true);
+						fw.write(getHTTPRequestMessage().getMessageBody());
+						fw.close();
+						response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
+						setHTTPResponseMessage(response);
+						sendResponseMessage();
 					} else if (method == HTTPMethod.PUT) {
 						//do something else
 					} else if (method == HTTPMethod.HEAD) {
-						File file = new File(serverDirectory + getHTTPRequestMessage().getLocalPathRequest());
+						File file = new File(serverDirectory + getLocalPathRequest());
 						if (file.exists()) {
-							response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+							response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
+							Date fileDate = new Date(file.lastModified());
+							response.setLastModifiedHeader(fileDate);
 						} else {
-							response.setStatusLine(requestMessage.getHTTPVersion() + " 404 Not found");
+							response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 404 Not found");
 						}
 						setHTTPResponseMessage(response);
 						sendResponseMessage();
 					} else if (method == HTTPMethod.GET) {
-						File file = new File(serverDirectory + getHTTPRequestMessage().getLocalPathRequest());
+						File file = new File(serverDirectory + getLocalPathRequest());
 						if (file.exists()) {
-							if (requestMessage.hasAsHeader("If-Modified-Since")) {
+							if (getHTTPRequestMessage().hasAsHeader("If-Modified-Since")) {
 								Date fileDate = new Date(file.lastModified());
-								Date ifModifiedSinceDate = requestMessage.getIfModifiedSinceDate();
+								Date ifModifiedSinceDate = getHTTPRequestMessage().getIfModifiedSinceDate();
 								if (ifModifiedSinceDate.after(fileDate)) {
-									response.setStatusLine(requestMessage.getHTTPVersion() + " 304 Not Modified");
+									response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 304 Not Modified");
 									response.setLastModifiedHeader(fileDate);
 								} else {
-									response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+									response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
 								}							
 							} else {
-								response.setStatusLine(requestMessage.getHTTPVersion() + " 200 OK");
+								response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
 							}
-							if (requestMessage.isHTTP1_1()) {
+							if (getHTTPRequestMessage().isHTTP1_1()) {
 								response.addAsHeader("Connection", "Keep-Alive");
 							}
-							response.setContentType(requestMessage.getLocalPathRequest());
+							response.setContentType(getLocalPathRequest());
 							response.addAsHeader("Content-Length", String.valueOf(file.length()));
 							setHTTPResponseMessage(response);
 							sendResponseMessage();
@@ -75,21 +102,31 @@ public class Handler implements Runnable {
 								sendFile(fileStream);
 							}
 						} else {
-							response.setStatusLine(requestMessage.getHTTPVersion() + " 404 Not found");
+							response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 404 Not found");
 							setHTTPResponseMessage(response);
 							sendResponseMessage();
 						}
 					}
-					if (requestMessage.isHTTP1_0()) {
-						socket.close();
+					if (getHTTPRequestMessage().isHTTP1_0() || getHTTPRequestMessage().hasAsHeaderValue(
+									"Connection", "close")) {
+						getSocket().close();
+					}
+				} else {
+					try {
+						Thread.sleep(DELAY);
+					} catch (InterruptedException ie) {}
+					timer += DELAY;
+					if (timer >= TIMEOUT) {
+						System.out.println("[Notice] timeout occured");
+						System.out.println(hash + " --> Closing this connection");
+						getSocket().close();
 					}
 				}
-//				Thread.sleep(100); //TODO adjust + set timeout
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 			try {
-				responseMessage.setStatusLine(requestMessage.getHTTPVersion() + " 500 Server Error");
+				responseMessage.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 500 Server Error");
 				sendResponseMessage();
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -114,6 +151,10 @@ public class Handler implements Runnable {
 	 */
 	public HTTPRequestMessage getHTTPRequestMessage() {
 		return requestMessage;
+	}
+	
+	public void setHTTPRequestMesssage(HTTPRequestMessage request) {
+		requestMessage = request;
 	}
 	
 	/**
@@ -162,29 +203,37 @@ public class Handler implements Runnable {
 	 * @throws IOException 
 	 */
 	private void parseRequestMessage(BufferedReader inFromClient) throws IOException {
-		requestMessage = new HTTPRequestMessage();
+		setHTTPRequestMesssage(new HTTPRequestMessage());
 		String requestLine = inFromClient.readLine();
-		System.out.println(hash + " Request line: " + requestLine);
 		if (requestLine == null) {
 			requestAccepted = false;
-			socket.close();
-			System.out.println(hash + " --> Closing this connection");
 		} else {
+			System.out.println(hash + " Request line: " + requestLine);
 			requestAccepted = true;
 			requestMessage.setRequestLine(requestLine);
 			System.out.println(hash + " Message:\r\n" + requestMessage.getRequestLine());
 			
 			// parse message headers
 			String responseString;
-			while ((responseString = inFromClient.readLine()) != null) {
+			boolean bodyMessage = false;
+			boolean headerMessage = true;
+			while (inFromClient.ready()) {
+				responseString = inFromClient.readLine();
 				System.out.println(responseString);
 				// check for the transition from the header part of the message to
 				// the body part of the message.
 				if (responseString.trim().equals("")) {
-					break; // all headers are parsed
+					// all headers are parsed
+					headerMessage = false;
+					bodyMessage = true;
+					continue;
 				}
-				String[] header = responseString.split(":", 2);
-				requestMessage.addAsHeader(header[0], header[1]);
+				if (headerMessage) {
+					String[] header = responseString.split(":", 2);
+					requestMessage.addAsHeader(header[0], header[1]);					
+				} else if (bodyMessage) {
+					requestMessage.addToMessageBody(responseString + "\n");
+				}
 			}
 		}
 	}
@@ -198,7 +247,7 @@ public class Handler implements Runnable {
 	private void sendResponseMessage() throws IOException {
 		// Create outputstream (convenient data writer) to this host.
 		DataOutputStream outToClient = new DataOutputStream(
-				socket.getOutputStream());
+				getSocket().getOutputStream());
 		outToClient.writeBytes(getHTTPResponseMessage().composeMessage());
 		outToClient.flush();
 	}
@@ -233,6 +282,14 @@ public class Handler implements Runnable {
 			System.out.println("[Notice] " + bytesRead +" bytes written to buffer");
 		}
 		outToClient.flush();
+	}
+	
+	private String getLocalPathRequest() {
+		String path = getHTTPRequestMessage().getLocalPathRequest();
+		if (path.contentEquals("/")) {
+			path = "/index.html";
+		}
+		return path;
 	}
 	
 	
