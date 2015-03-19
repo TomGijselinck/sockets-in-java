@@ -1,3 +1,4 @@
+package HTTP.message;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,6 +14,18 @@ public abstract class HTTPMessage {
 	 */
 	public Map<String, String> getHeaders() {
 		return headers;
+	}
+	
+	public boolean hasAsHeader(String header) {
+		return headers.containsKey(header);
+	}
+
+	public boolean hasAsHeaderValue(String header, String value) {
+		if (hasAsHeader(header)) {
+			return headers.get(header).contentEquals(value);
+		} else {
+			return false;
+		}
 	}
 	
 	public String getHeaderValue(String header) {

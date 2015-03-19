@@ -1,3 +1,4 @@
+package HTTP.client;
 //java socket client example
 import java.io.*;
 import java.net.*;

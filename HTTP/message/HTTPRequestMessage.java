@@ -1,7 +1,11 @@
+package HTTP.message;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
+
+import HTTP.client.HTTPClient;
 
 /**
  * A class of HTTP request messages as special kind of HTTP messages involving
@@ -19,6 +23,10 @@ public class HTTPRequestMessage extends HTTPMessage {
 		setMethod(method);
 		setLocalPathRequest(pathRequestedResource);
 		setHTTPVersion(HTTPVersion);
+	}
+	
+	public HTTPRequestMessage() {
+		super();
 	}
 
 	public HTTPMethod getMethod() {
@@ -60,9 +68,20 @@ public class HTTPRequestMessage extends HTTPMessage {
 	}
 
 	private HTTPClient client;
-
+	
 	public String getRequestLine() {
 		return method + " " + localPathRequest + " " + HTTPVersion;
+	}
+	
+	public void setRequestLine(String request) {
+		parseRequestLine(request);
+	}
+
+	private void parseRequestLine(String requestLine) {
+		String[] splitString = requestLine.split(" ", 3);
+		setMethod(HTTPMethod.parseMethod(splitString[0]));
+		setLocalPathRequest(splitString[1]);
+		setHTTPVersion(splitString[2]);
 	}
 
 	public String composeMessage() {
@@ -73,6 +92,7 @@ public class HTTPRequestMessage extends HTTPMessage {
 			message += header;
 		}
 		message += "\r\n";
+		message += getMessageBody() + "\n";
 		return message;
 	}
 	
@@ -82,6 +102,22 @@ public class HTTPRequestMessage extends HTTPMessage {
 		dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
 		addAsHeader("If-Modified-Since", dateFormat.format(date));
 		
+	}
+	
+	public Date getIfModifiedSinceDate() throws ParseException {
+		String dateString = getHeaderValue("If-Modified-Since");
+		SimpleDateFormat dateFormat = 
+				new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+		Date date = dateFormat.parse(dateString);
+		return date;
+	}
+
+	public boolean isHTTP1_0() {
+		return getHTTPVersion().contains("1.0");
+	}
+	
+	public boolean isHTTP1_1() {
+		return getHTTPVersion().contains("1.1");
 	}
 
 }

@@ -1,3 +1,4 @@
+package HTTP.client;
 import java.io.*;
 import java.net.*;
 import java.util.Arrays;
@@ -7,6 +8,10 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import HTTP.message.HTTPMethod;
+import HTTP.message.HTTPRequestMessage;
+import HTTP.message.HTTPResponseMessage;
 
 public class HTTPClient {
 
@@ -23,24 +28,48 @@ public class HTTPClient {
 			System.exit(1);
 		}
 		String HTTPversion = args[3];
+		String clientName;
+		if (args.length == 5) {
+			clientName = args[4];
+		} else {
+			clientName = "omega";
+		}
 		
 		// Create an instance of this class to enable bidirectional 
 		// communication using HTTP.
-		HTTPClient testClient = new HTTPClient(uri.getHost(), port);
+		HTTPClient testClient = new HTTPClient(uri.getHost(), port, "/" + clientName);
 		
 		// Create the first request message using the given arguments.
+		String requestUri = uri.getPath();
+		if (requestUri.contentEquals("")) {
+			requestUri = "/index.html";
+		}
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
-				"/", HTTPversion);
+				requestUri, HTTPversion);
 		request.addAsHeader("Host", testClient.getHost());
+		request.addAsHeader("From", clientName + "@localhost");
+		if (method.equals(HTTPMethod.POST)) {
+			request.addAsHeader("Content-Type", "text/plain");
+//			request.addAsHeader("Content-Length", "0"); //TODO aanpassen aan user input
+			try {
+				InputStream in = System.in;
+				InputStreamReader charsIn = new InputStreamReader(in);
+				BufferedReader bufferedCharsIn = new BufferedReader(charsIn);
+				String line = bufferedCharsIn.readLine();
+				request.setMessageBody(line);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 		if (method.equals(HTTPMethod.GET)) {
 			File file = new File(testClient.workingDirectory + "/"
 					+ testClient.host + "/index.html");
 			if (file.exists()) {
 				request.setIfModifiedSinceHeader(new Date(file.lastModified()));
 			}
-		}
-		if (HTTPversion.contains("1.1")) {
-			request.addAsHeader("Connection", "Keep-Alive");
+			if (HTTPversion.contains("1.1")) { //TODO require this header?
+				request.addAsHeader("Connection", "Keep-Alive");
+			}
 		}
 		testClient.setHTTPRequestMessage(request);
 		
@@ -61,11 +90,15 @@ public class HTTPClient {
 		
 
 	}
-
-	public HTTPClient(String host, int port) {
+	
+	public HTTPClient(String host, int port, String clientName) {
 		setHost(host);
 		setPort(port);
-		setWorkingDirectory("/home/tom/http");
+		setWorkingDirectory("/home/tom/http" + clientName);
+	}
+
+	public HTTPClient(String host, int port) {
+		this(host, port, "");
 	}
 
 	public HTTPRequestMessage getRequestMessage() {
@@ -168,8 +201,8 @@ public class HTTPClient {
 		System.out.println("================RESPONSE================");
 		
 		// Set the current point in the stream as the return point with a 
-		// maximum possible read data of 3072 bytes before the mark is given up.
-		bis.mark(10*1024); // less results in lost mark point
+		// maximum possible read data of 10240 bytes before the mark is given up.
+		bis.mark(1024*1024); // to be sure mark point is not lost
 		String statusLine = serverResponseText.readLine();
 		responseMessage.setStatusLine(statusLine);
 		System.out.println(responseMessage.getStatusLine());
@@ -190,6 +223,8 @@ public class HTTPClient {
 		// parse message body if it exists
 		if (getRequestMessage().getMethod() == HTTPMethod.HEAD) {
 			// no message body, do nothing
+		} else if (getRequestMessage().getMethod() == HTTPMethod.POST) {
+			// no message body, do nothing
 		} else if (responseMessage.getResponseStatusCode() == 304) {
 			System.out.println("[Notice] requested resource not modified");
 		} else if (responseMessage.containsTextFile()) {
@@ -202,10 +237,8 @@ public class HTTPClient {
 			parseBodyMessage(bis);
 		}
 		
-		if (getRequestMessage().getHTTPVersion().contains("1.0")) {
+		if (getRequestMessage().isHTTP1_0()) {
 			getClientSocket().close();
-		} else if (getRequestMessage().getHTTPVersion().contains("1.1")) {
-			getClientSocket().setKeepAlive(true);
 		}
 		System.out.println("");
 	}
@@ -220,7 +253,7 @@ public class HTTPClient {
 	public InputStream sendHTTPRequestMessage() throws IOException {
 		HTTPRequestMessage httpRequest = getRequestMessage();
 		// Create a socket to the given URI at the given port.
-		if (getRequestMessage().getHTTPVersion().contains("1.0")) {
+		if (getRequestMessage().isHTTP1_0()) {
 			setClientSocket(new Socket(getHost(), getPort()));
 		}
 
@@ -236,6 +269,7 @@ public class HTTPClient {
 		// Compose HTTP request message and send to the server.
 		outToServer.writeBytes(httpRequest.composeMessage());
 		outToServer.flush();
+//		getClientSocket().shutdownInput(); // Places the input stream for this socket at "end of stream"
 		System.out.println("message send: \n"
 				+ httpRequest.composeMessage().trim() + "\nto " + host + ":"
 				+ port);
@@ -251,6 +285,7 @@ public class HTTPClient {
 		// path embedded objects using a HTTP GET request message.
 		Elements links = doc.select("img[src]");
 		if (links.isEmpty()) {System.out.println("[Notice] no embedded images");}
+		int numberOfObjectsRequested = 0;
 		for (Element link : links) {
 			try {
 				URI uri = new URI(link.attr("abs:src"));
@@ -264,8 +299,14 @@ public class HTTPClient {
 					} else {
 						getRequestMessage().removeAsHeader("If-Modified-Since");
 					}
+					// Add "Connection: close" as header to indicate last 
+					// request message.
+					if (numberOfObjectsRequested +1 == links.size() && getRequestMessage().isHTTP1_1()) {
+						getRequestMessage().addAsHeader("Connection", "close");
+					}
 					InputStream inFromServer = sendHTTPRequestMessage();
 					parseHTTPMessage(inFromServer);
+					numberOfObjectsRequested += 1;
 				}
 			} catch (URISyntaxException | IOException | InterruptedException e) {
 				e.printStackTrace();
@@ -311,7 +352,7 @@ public class HTTPClient {
 				System.out.println(textToDisplay);
 				responseMessage.addToMessageBody(textToDisplay);
 			} else {
-				System.out.println("[Notice] " + bytesRead +" bytes read to buffer");
+				System.out.println("[Notice] " + bytesRead +" bytes read from buffer");
 			}
 			bodyBytesRead += bytesRead - headerBytesRead;
 			outStream.write(buffer, headerBytesRead, bytesRead-headerBytesRead);
