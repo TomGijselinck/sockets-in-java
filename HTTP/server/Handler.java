@@ -24,9 +24,10 @@ public class Handler implements Runnable {
 	@Override
 	public void run() {
 		BufferedReader inFromClient;
+		boolean threadUsed = false;
 		int timer = 0;
 		int DELAY = 10;
-		int TIMEOUT = 2000; // 10 seconds
+		int TIMEOUT = 2000; // 2<-->10 seconds
 		try {
 			while (!socket.isClosed()){
 				// Create inputstream (convenient data reader) to this host.
@@ -36,6 +37,7 @@ public class Handler implements Runnable {
 				
 				parseRequestMessage(inFromClient);
 				if (requestAccepted) {
+					threadUsed = true;
 					timer = 0;
 					HTTPResponseMessage response = new HTTPResponseMessage();
 					response.setDate(new Date());
@@ -134,7 +136,7 @@ public class Handler implements Runnable {
 					} catch (InterruptedException ie) {}
 					timer += DELAY;
 					if (timer >= TIMEOUT) {
-						if (!getHTTPRequestMessage().getRequestLine().contains("HTTP")) {
+						if (!threadUsed) {
 							// this thread is never used
 							getSocket().close();
 						} else {
