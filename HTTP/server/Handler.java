@@ -40,8 +40,20 @@ public class Handler implements Runnable {
 					HTTPResponseMessage response = new HTTPResponseMessage();
 					response.setDate(new Date());
 					HTTPMethod method = getHTTPRequestMessage().getMethod();
+					String HTTPVersion = getHTTPRequestMessage().getHTTPVersion();
 					if (getHTTPRequestMessage().hasAsHeaderValue("Connection", "close")) {
 						response.addAsHeader("Connection", "close");
+					}
+					
+					if (getHTTPRequestMessage().isHTTP1_1()) {
+						if (!getHTTPRequestMessage().hasAsHeader("host")) {
+							response.setStatusLine(HTTPVersion + " 400 Bad Request");
+							setHTTPResponseMessage(response);
+							sendResponseMessage();
+							System.out.println("[Notice] bad request --> closing connection");
+							getSocket().close();
+							break;
+						}
 					}
 					
 					// Resolve different HTTP methods; HEAD, GET, PUT, POST
@@ -64,7 +76,7 @@ public class Handler implements Runnable {
 						FileWriter fw = new FileWriter(fullFileName, append);
 						fw.write(getHTTPRequestMessage().getMessageBody());
 						fw.close();
-						response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
+						response.setStatusLine(HTTPVersion + " 200 OK");
 						setHTTPResponseMessage(response);
 						sendResponseMessage();
 					} else if (method == HTTPMethod.PUT) {
@@ -72,11 +84,11 @@ public class Handler implements Runnable {
 					} else if (method == HTTPMethod.HEAD) {
 						File file = new File(serverDirectory + getLocalPathRequest());
 						if (file.exists()) {
-							response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
+							response.setStatusLine(HTTPVersion + " 200 OK");
 							Date fileDate = new Date(file.lastModified());
 							response.setLastModifiedHeader(fileDate);
 						} else {
-							response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 404 Not found");
+							response.setStatusLine(HTTPVersion + " 404 Not found");
 						}
 						setHTTPResponseMessage(response);
 						sendResponseMessage();
@@ -87,13 +99,13 @@ public class Handler implements Runnable {
 								Date fileDate = new Date(file.lastModified());
 								Date ifModifiedSinceDate = getHTTPRequestMessage().getIfModifiedSinceDate();
 								if (ifModifiedSinceDate.after(fileDate)) {
-									response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 304 Not Modified");
+									response.setStatusLine(HTTPVersion + " 304 Not Modified");
 									response.setLastModifiedHeader(fileDate);
 								} else {
-									response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
+									response.setStatusLine(HTTPVersion + " 200 OK");
 								}							
 							} else {
-								response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 200 OK");
+								response.setStatusLine(HTTPVersion + " 200 OK");
 							}
 							if (getHTTPRequestMessage().isHTTP1_1()) {
 								response.addAsHeader("Connection", "Keep-Alive");
@@ -107,7 +119,7 @@ public class Handler implements Runnable {
 								sendFile(fileStream);
 							}
 						} else {
-							response.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 404 Not found");
+							response.setStatusLine(HTTPVersion + " 404 Not found");
 							setHTTPResponseMessage(response);
 							sendResponseMessage();
 						}

@@ -46,7 +46,7 @@ public class HTTPClient {
 		}
 		HTTPRequestMessage request = new HTTPRequestMessage(method,
 				requestUri, HTTPversion);
-		request.addAsHeader("Host", testClient.getHost());
+//		request.addAsHeader("Host", testClient.getHost());
 		request.addAsHeader("From", clientName + "@localhost");
 		if (method.equals(HTTPMethod.POST) || method == HTTPMethod.PUT) {
 			if (request.getLocalPathRequest().contains("index.html")) {
@@ -228,6 +228,8 @@ public class HTTPClient {
 			// no message body, do nothing
 		} else if (method == HTTPMethod.POST || method == HTTPMethod.PUT) {
 			// no message body, do nothing
+		} else if (getResponseMessage().getResponseStatusCode() == 400) {
+			// bad request, no message body, do nothing
 		} else if (responseMessage.getResponseStatusCode() == 304) {
 			System.out.println("[Notice] requested resource not modified");
 		} else if (responseMessage.containsTextFile()) {
