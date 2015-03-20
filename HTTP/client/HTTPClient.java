@@ -48,7 +48,7 @@ public class HTTPClient {
 				requestUri, HTTPversion);
 		request.addAsHeader("Host", testClient.getHost());
 		request.addAsHeader("From", clientName + "@localhost");
-		if (method.equals(HTTPMethod.POST) || method == HTTPMethod.PUT) {
+		if (method == HTTPMethod.POST || method == HTTPMethod.PUT) {
 			if (request.getLocalPathRequest().contains("index.html")) {
 				request.setLocalPathRequest("/");
 			}
@@ -63,9 +63,9 @@ public class HTTPClient {
 				e.printStackTrace();
 			}
 		}
-		if (method.equals(HTTPMethod.GET)) {
+		if (method == HTTPMethod.GET || method == HTTPMethod.HEAD) {
 			File file = new File(testClient.workingDirectory + "/"
-					+ testClient.host + "/index.html");
+					+ testClient.host + requestUri);
 			if (file.exists()) {
 				request.setIfModifiedSinceHeader(new Date(file.lastModified()));
 			}
@@ -93,75 +93,175 @@ public class HTTPClient {
 
 	}
 	
+	/**
+	 * Initialize this new HTTP client with the given host, given port and given 
+	 * client name.
+	 * 
+	 * @param 	host
+	 * 			The host for this new HTTP client.
+	 * @param 	port
+	 * 			The port for this new HTTP client.
+	 * @param 	clientName
+	 * 			The client name for this new HTTP client.
+	 */
 	public HTTPClient(String host, int port, String clientName) {
 		setHost(host);
 		setPort(port);
 		setWorkingDirectory("/home/tom/http" + clientName);
 	}
 
+	/**
+	 * Initialize this new HTTP client with the given host, given port and with
+	 * a client name of Lambda.
+	 * 
+	 * @param 	host
+	 * 			The host for this new HTTP client.
+	 * @param 	port
+	 * 			The port for this new HTTP client.
+	 */
 	public HTTPClient(String host, int port) {
-		this(host, port, "");
+		this(host, port, "Lambda");
 	}
 
+	/**
+	 * Return the request message of this HTTP client.
+	 */
 	public HTTPRequestMessage getRequestMessage() {
 		return requestMessage;
 	}
 
+	/**
+	 * Set the request message for this HTTP client to the given request 
+	 * message.
+	 * 
+	 * @param 	requestMessage
+	 * 			The new request message for this HTTP client.
+	 */
 	public void setHTTPRequestMessage(HTTPRequestMessage requestMessage) {
 		this.requestMessage = requestMessage;
 		requestMessage.setClient(this);
 	}
 
+	/**
+	 * Variable referencing the request message of this HTTP client.
+	 */
 	private HTTPRequestMessage requestMessage;
 
+	/**
+	 * Return the response message of this HTTP client.
+	 */
 	public HTTPResponseMessage getResponseMessage() {
 		return responseMessage;
 	}
 
+	/**
+	 * Set the response message for this HTTP client to the given response
+	 * message.
+	 * 
+	 * @param 	responseMessage
+	 * 			The new response message for this HTTP client.
+	 */
 	public void setResponseMessage(HTTPResponseMessage responseMessage) {
 		this.responseMessage = responseMessage;
 	}
 
+	/**
+	 * Variable referencing the response message of this HTTP client. 
+	 */
 	private HTTPResponseMessage responseMessage;
 
+	/**
+	 * Return the host of this HTTP client.
+	 */
 	public String getHost() {
 		return host;
 	}
 
+	/**
+	 * Set the host of this HTTP client to the given host.
+	 * 
+	 * @param 	host
+	 * 			The new host for his HTTP client.
+	 */
 	public void setHost(String host) {
 		this.host = host;
 	}
 
+	/**
+	 * Variable referencing the host of this HTTP client.
+	 */
 	private String host;
 
+	/**
+	 * Return the port of this HTTP client.
+	 */
 	public int getPort() {
 		return port;
 	}
 
+	/**
+	 * Set the port for this HTTP client to the given port.
+	 * 
+	 * @param 	port
+	 * 			The new port for this HTTP client.
+	 */
 	public void setPort(int port) {
 		this.port = port;
 	}
 
+	/**
+	 * Variable referencing the port of this HTTP client.
+	 */
 	private int port;
 	
+	/**
+	 * Return the socket of this HTTP client.
+	 */
 	public Socket getClientSocket() {
 		return clientSocket;
 	}
 	
+	/**
+	 * Set the socket for this HTTP client by creating a new socket using the
+	 * host of this HTTP client and the port of this HTTP client.
+	 * 
+	 * @throws 	UnknownHostException
+	 * @throws 	IOException
+	 */
 	public void setClientSocket() throws UnknownHostException, IOException {
 		clientSocket = new Socket(getHost(), getPort());
 	}
 	
+	/**
+	 * Set the socket for this HTTP client to the given socket.
+	 * 
+	 * @param 	socket
+	 * 			The new socket for this HTTP client.
+	 */
 	public void setClientSocket(Socket socket) {
 		clientSocket = socket;
 	}
 	
+	/**
+	 * Variable referencing the socket of this HTTP client.
+	 */
 	private Socket clientSocket;
 
+	/**
+	 * Return the working directory of this HTTP client.
+	 * 		The working directory is the directory where the server serves its
+	 * 		content.
+	 */
 	public String getWorkingDirectory() {
 		return workingDirectory;
 	}
 	
+	/**
+	 * Set the working directory for this HTTP client to the given directory.
+	 * 
+	 * @param 	directory
+	 * 			The new working directory for this HTTP client.
+	 */
 	public void setWorkingDirectory(String directory) {
 		workingDirectory = directory;
 	}
@@ -180,7 +280,7 @@ public class HTTPClient {
 	 * @param 	inFromServer
 	 * 			The input stream to parse the HTTP message from.
 	 * @throws 	IOException
-	 * @throws InterruptedException 
+	 * @throws 	InterruptedException 
 	 */
 	public void parseHTTPMessage(InputStream inFromServer)
 			throws IOException, InterruptedException {
@@ -206,8 +306,8 @@ public class HTTPClient {
 		// maximum possible read data of 10240 bytes before the mark is given up.
 		bis.mark(1024*1024); // to be sure mark point is not lost
 		String statusLine = serverResponseText.readLine();
-		responseMessage.setStatusLine(statusLine);
-		System.out.println(responseMessage.getStatusLine());
+		getResponseMessage().setStatusLine(statusLine);
+		System.out.println(getResponseMessage().getStatusLine());
 		
 		// parse message headers
 		String responseString;
@@ -219,7 +319,7 @@ public class HTTPClient {
 				break; // all headers are parsed
 			}
 			String[] header = responseString.split(":", 2);
-			responseMessage.addAsHeader(header[0], header[1]);
+			getResponseMessage().addAsHeader(header[0], header[1]);
 		}
 		
 		// parse message body if it exists
@@ -232,13 +332,13 @@ public class HTTPClient {
 			// bad request, no message body, do nothing
 		} else if (getResponseMessage().getResponseStatusCode() == 404) {
 			// Not found, no message body, do nothing
-		} else if (responseMessage.getResponseStatusCode() == 304) {
+		} else if (getResponseMessage().getResponseStatusCode() == 304) {
 			System.out.println("[Notice] requested resource not modified");
-		} else if (responseMessage.containsTextFile()) {
+		} else if (getResponseMessage().containsTextFile()) {
 			System.out.println("[Notice] message body is text");
 			bis.reset();
 			parseBodyMessage(bis);
-		} else if (responseMessage.containsBinaryFile()) {
+		} else if (getResponseMessage().containsBinaryFile()) {
 			System.out.println("[Notice] message body is binary data");
 			bis.reset();
 			parseBodyMessage(bis);
@@ -254,8 +354,9 @@ public class HTTPClient {
 	 * Send the HTTP request message of this HTTP client to the host of this 
 	 * client and return the response of the host to the send request message.
 	 * 
-	 * @return	The resulting input stream is the response from the host.
-	 * @throws IOException
+	 * @return	InputStream
+	 * 			The resulting input stream as the response from the host.
+	 * @throws 	IOException
 	 */
 	public InputStream sendHTTPRequestMessage() throws IOException {
 		HTTPRequestMessage httpRequest = getRequestMessage();
@@ -276,7 +377,6 @@ public class HTTPClient {
 		// Compose HTTP request message and send to the server.
 		outToServer.writeBytes(httpRequest.composeMessage());
 		outToServer.flush();
-//		getClientSocket().shutdownInput(); // Places the input stream for this socket at "end of stream"
 		System.out.println("message send: \n"
 				+ httpRequest.composeMessage().trim() + "\nto " + host + ":"
 				+ port);
@@ -331,7 +431,7 @@ public class HTTPClient {
 		}
 		FileOutputStream fos = new FileOutputStream(file.getAbsoluteFile());
 		BufferedOutputStream outStream = new BufferedOutputStream(fos);
-		boolean text = responseMessage.containsTextFile();
+		boolean text = getResponseMessage().containsTextFile();
 		byte[] buffer = new byte[1024];
 		boolean endOfHeaderFound = false;
 		int bytesToRead = Integer.parseInt(getResponseMessage().getHeaderValue(
@@ -357,7 +457,7 @@ public class HTTPClient {
 				byte [] subArray = Arrays.copyOfRange(buffer, headerBytesRead, bytesRead);
 				String textToDisplay = new String(subArray);
 				System.out.println(textToDisplay);
-				responseMessage.addToMessageBody(textToDisplay);
+				getResponseMessage().addToMessageBody(textToDisplay);
 			} else {
 				System.out.println("[Notice] " + bytesRead +" bytes read from buffer");
 			}

@@ -14,6 +14,15 @@ public class Handler implements Runnable {
 	//tmp
 	int hash;
 	
+	/**
+	 * Initialize this new HTTP server handler with the given socket and given
+	 * hash.
+	 * 
+	 * @param 	connectionSocket
+	 * 			The socket for this new handler.
+	 * @param 	hash
+	 * 			The hash for this new handler.
+	 */
 	public Handler(Socket connectionSocket, int hash) {
 		socket = connectionSocket;
 		requestMessage = new HTTPRequestMessage();
@@ -27,38 +36,47 @@ public class Handler implements Runnable {
 		boolean threadUsed = false;
 		int timer = 0;
 		int DELAY = 10;
-		int TIMEOUT = 2000; // 2<-->10 seconds
+		int TIMEOUT = 2000;
 		try {
 			while (!socket.isClosed()){
-				// Create inputstream (convenient data reader) to this host.
+				// Create an input stream (convenient data reader) to this host.
 				InputStreamReader inputStreamReader = 
 						new InputStreamReader(getSocket().getInputStream());
 				inFromClient = new BufferedReader(inputStreamReader);	
+				requestAccepted = parseRequestMessage(inFromClient);
 				
-				parseRequestMessage(inFromClient);
+				// If the request message from the client is accepted, create
+				// a response message and send it back to the client.
 				if (requestAccepted) {
 					threadUsed = true;
 					timer = 0;
 					HTTPResponseMessage response = new HTTPResponseMessage();
 					response.setDate(new Date());
-					HTTPMethod method = getHTTPRequestMessage().getMethod();
-					String HTTPVersion = getHTTPRequestMessage().getHTTPVersion();
-					if (getHTTPRequestMessage().hasAsHeaderValue("Connection", "close")) {
+					HTTPMethod method = getRequestMessage().getMethod();
+					String HTTPVersion = getRequestMessage().getHTTPVersion();
+					
+					// Add "Connection: close" header if the client has included
+					// this header in its request to this server.
+					if (getRequestMessage().hasAsHeaderValue("Connection", "close")) {
 						response.addAsHeader("Connection", "close");
 					}
 					
-					if (getHTTPRequestMessage().isHTTP1_1()) {
-						if (!getHTTPRequestMessage().hasAsHeader("Host")) {
-							response.setStatusLine(HTTPVersion + " 400 Bad Request");
-							setHTTPResponseMessage(response);
-							sendResponseMessage();
-							System.out.println("[Notice] bad request --> closing connection");
-							getSocket().close();
-							break;
-						}
+					// Send a "400 Bad Request" and close the connection to the 
+					// client connected to this server thread if the client used 
+					// HTTP 1.1 and has not included the host header in its 
+					// request message.
+					if (getRequestMessage().isHTTP1_1()
+							&& !getRequestMessage().hasAsHeader("Host")) {
+						response.setStatusLine(HTTPVersion + " 400 Bad Request");
+						setResponseMessage(response);
+						sendResponseMessage();
+						System.out.println("[Notice] bad request --> closing connection");
+						getSocket().close();
+						break;
 					}
 					
 					// Resolve different HTTP methods; HEAD, GET, PUT, POST
+					// Resolve POST and PUT method
 					if (method == HTTPMethod.POST || method == HTTPMethod.PUT) {
 						boolean append = false;
 						String fileName = FilenameUtils.getName(getLocalPathRequest());
@@ -74,30 +92,40 @@ public class Handler implements Runnable {
 							}
 						} else {
 							fullFileName = serverDirectory + getLocalPathRequest();
+							if (method == HTTPMethod.POST) {
+								append = true;
+							} else if (method == HTTPMethod.PUT) {
+								append = false;
+							}
 						}
 						FileWriter fw = new FileWriter(fullFileName, append);
-						fw.write(getHTTPRequestMessage().getMessageBody());
+						fw.write(getRequestMessage().getMessageBody());
 						fw.close();
 						response.setStatusLine(HTTPVersion + " 200 OK");
-						setHTTPResponseMessage(response);
+						setResponseMessage(response);
 						sendResponseMessage();
+						
+					// Resolve HEAD method
 					} else if (method == HTTPMethod.HEAD) {
 						File file = new File(serverDirectory + getLocalPathRequest());
 						if (file.exists()) {
 							response.setStatusLine(HTTPVersion + " 200 OK");
 							Date fileDate = new Date(file.lastModified());
 							response.setLastModifiedHeader(fileDate);
+							response.setContentType(getLocalPathRequest());
 						} else {
 							response.setStatusLine(HTTPVersion + " 404 Not found");
 						}
-						setHTTPResponseMessage(response);
+						setResponseMessage(response);
 						sendResponseMessage();
+						
+					//Resolve GET method
 					} else if (method == HTTPMethod.GET) {
 						File file = new File(serverDirectory + getLocalPathRequest());
 						if (file.exists()) {
-							if (getHTTPRequestMessage().hasAsHeader("If-Modified-Since")) {
+							if (getRequestMessage().hasAsHeader("If-Modified-Since")) {
 								Date fileDate = new Date(file.lastModified());
-								Date ifModifiedSinceDate = getHTTPRequestMessage().getIfModifiedSinceDate();
+								Date ifModifiedSinceDate = getRequestMessage().getIfModifiedSinceDate();
 								if (ifModifiedSinceDate.after(fileDate)) {
 									response.setStatusLine(HTTPVersion + " 304 Not Modified");
 									response.setLastModifiedHeader(fileDate);
@@ -107,12 +135,12 @@ public class Handler implements Runnable {
 							} else {
 								response.setStatusLine(HTTPVersion + " 200 OK");
 							}
-							if (getHTTPRequestMessage().isHTTP1_1() && !response.hasAsHeaderValue("Connection", "close")) {
+							if (getRequestMessage().isHTTP1_1() && !response.hasAsHeaderValue("Connection", "close")) {
 								response.addAsHeader("Connection", "Keep-Alive");
 							}
 							response.setContentType(getLocalPathRequest());
 							response.addAsHeader("Content-Length", String.valueOf(file.length()));
-							setHTTPResponseMessage(response);
+							setResponseMessage(response);
 							sendResponseMessage();
 							if (responseMessage.getResponseStatusCode() == 200) {
 								BufferedInputStream fileStream = new BufferedInputStream(getFileStream(file));
@@ -121,19 +149,38 @@ public class Handler implements Runnable {
 						} else {
 							response.setStatusLine(HTTPVersion + " 404 Not found");
 							response.addAsHeader("Connection", "close");
-							setHTTPResponseMessage(response);
+							setResponseMessage(response);
 							sendResponseMessage();
 						}
+					
+					// No Correct method used, send bad request and close the 
+					// socket of this server handler.
+					} else {
+						response.setStatusLine(HTTPVersion + " 400 Bad Request");
+						setResponseMessage(response);
+						sendResponseMessage();
+						System.out.println("[Notice] bad request --> closing connection");
+						getSocket().close();
+						break;
 					}
-					if (getHTTPRequestMessage().isHTTP1_0() || getHTTPResponseMessage().hasAsHeaderValue(
+					
+					// Close the socket of this server handler if HTTP 1.0 is
+					// used or if the response message contains the
+					// "Connection: close" header.
+					if (getRequestMessage().isHTTP1_0() || getResponseMessage().hasAsHeaderValue(
 									"Connection", "close")) {
 						System.out.println(hash + " --> Closing this connection");
 						getSocket().close();
 					}
+				
+				// Use a timeout to limit the maximum time an idle connection is
+				// allowed to remain connected.
 				} else {
 					try {
 						Thread.sleep(DELAY);
-					} catch (InterruptedException ie) {}
+					} catch (InterruptedException ie) {
+						ie.printStackTrace();
+					}
 					timer += DELAY;
 					if (timer >= TIMEOUT) {
 						if (!threadUsed) {
@@ -147,10 +194,12 @@ public class Handler implements Runnable {
 					}
 				}
 			}
+		// Catch any possible exception and try to send a "500 Server Error" to
+		// the client.
 		} catch (Exception e) {
 			e.printStackTrace();
 			try {
-				responseMessage.setStatusLine(getHTTPRequestMessage().getHTTPVersion() + " 500 Server Error");
+				responseMessage.setStatusLine(getRequestMessage().getHTTPVersion() + " 500 Server Error");
 				sendResponseMessage();
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -173,11 +222,17 @@ public class Handler implements Runnable {
 	/**
 	 * Return the HTTP request message of this handler.
 	 */
-	public HTTPRequestMessage getHTTPRequestMessage() {
+	public HTTPRequestMessage getRequestMessage() {
 		return requestMessage;
 	}
 	
-	public void setHTTPRequestMesssage(HTTPRequestMessage request) {
+	/**
+	 * Set the HTTPRequestMessage of this handler to the given request message.
+	 * 
+	 * @param 	request
+	 * 			The new request message for this handler.
+	 */
+	public void setRequestMesssage(HTTPRequestMessage request) {
 		requestMessage = request;
 	}
 	
@@ -190,7 +245,7 @@ public class Handler implements Runnable {
 	/**
 	 * Return the HTTP response message of this handler.
 	 */
-	public HTTPResponseMessage getHTTPResponseMessage() {
+	public HTTPResponseMessage getResponseMessage() {
 		return responseMessage;
 	}
 	
@@ -201,7 +256,7 @@ public class Handler implements Runnable {
 	 * @param 	responseMessage
 	 * 			The new response message for this handler.
 	 */
-	public void setHTTPResponseMessage(HTTPResponseMessage responseMessage) {
+	public void setResponseMessage(HTTPResponseMessage responseMessage) {
 		this.responseMessage = responseMessage;
 	}
 	
@@ -211,6 +266,10 @@ public class Handler implements Runnable {
 	 */
 	private HTTPResponseMessage responseMessage;
 	
+	/**
+	 * Variable referencing if the last request message from the client 
+	 * connected to this server is accepted or not.
+	 */
 	private boolean requestAccepted;
 	
 	/**
@@ -224,18 +283,19 @@ public class Handler implements Runnable {
 	 * 
 	 * @param 	inFromClient
 	 * 			The buffered reader to read the HTTP request message from.
-	 * @throws IOException 
+	 * @throws 	IOException 
 	 */
-	private void parseRequestMessage(BufferedReader inFromClient) throws IOException {
-		setHTTPRequestMesssage(new HTTPRequestMessage());
+	private boolean parseRequestMessage(BufferedReader inFromClient) throws IOException {
+		setRequestMesssage(new HTTPRequestMessage());
 		String requestLine = inFromClient.readLine();
+		boolean requestAccept = false;
 		if (requestLine == null) {
-			requestAccepted = false;
+			requestAccept = false;
 		} else {
 			System.out.println(hash + " Request line: " + requestLine);
-			requestAccepted = true;
-			requestMessage.setRequestLine(requestLine);
-			System.out.println(hash + " Message:\r\n" + requestMessage.getRequestLine());
+			requestAccept = true;
+			getRequestMessage().setRequestLine(requestLine);
+			System.out.println(hash + " Message:\r\n" + getRequestMessage().getRequestLine());
 			
 			// parse message headers
 			String responseString;
@@ -254,12 +314,13 @@ public class Handler implements Runnable {
 				}
 				if (headerMessage) {
 					String[] header = responseString.split(":", 2);
-					requestMessage.addAsHeader(header[0], header[1]);					
+					getRequestMessage().addAsHeader(header[0], header[1]);					
 				} else if (bodyMessage) {
-					requestMessage.addToMessageBody(responseString + "\n");
+					getRequestMessage().addToMessageBody(responseString + "\n");
 				}
 			}
 		}
+		return requestAccept;
 	}
 	
 	/**
@@ -272,7 +333,7 @@ public class Handler implements Runnable {
 		// Create outputstream (convenient data writer) to this host.
 		DataOutputStream outToClient = new DataOutputStream(
 				getSocket().getOutputStream());
-		outToClient.writeBytes(getHTTPResponseMessage().composeMessage());
+		outToClient.writeBytes(getResponseMessage().composeMessage());
 		outToClient.flush();
 	}
 	
@@ -309,7 +370,7 @@ public class Handler implements Runnable {
 	}
 	
 	private String getLocalPathRequest() {
-		String path = getHTTPRequestMessage().getLocalPathRequest();
+		String path = getRequestMessage().getLocalPathRequest();
 		if (path.contentEquals("/")) {
 			path = "/index.html";
 		}

@@ -8,7 +8,7 @@ public class HTTPServer {
 	private static ServerSocket welcomeSocket;
 
 	public static void main(String argv[]) throws Exception {
-		// Create server (incoming) socket on port 5678.
+		// Create a server (incoming) socket on port 5678.
 		welcomeSocket = new ServerSocket();
 		welcomeSocket.setReuseAddress(true);
 		welcomeSocket.bind(new InetSocketAddress(5678));

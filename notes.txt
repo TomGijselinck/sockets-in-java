@@ -5,12 +5,12 @@ www.example.com
 1.1 ok
 
 www.tcpipguide.com
-1.0 x
+1.0 ok
 1.1 x
 
 www.jmarshall.com
-1.0 x
-1.1 x
+1.0 ok
+1.1 ok
 
 www.tldp.org
 1.0 ok
@@ -27,4 +27,3 @@ www.linux-ip.net
 www.puppylinux.com
 1.0 ok
 1.1 ok
-(!): buffer reset werkt niet (markpos->-1)
